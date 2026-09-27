@@ -1,0 +1,24 @@
+{
+  "pages": [
+    "pages/index/index"
+  ],
+  "window": {
+    "navigationStyle": "custom",
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "灵境·导览",
+    "backgroundColor": "#0c0e14",
+    "backgroundTextStyle": "dark",
+    "disableScroll": true
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于按您所在景区提供导览与就近指路"
+    }
+  },
+  "requiredPrivateInfos": [
+    "chooseLocation"
+  ],
+  "lazyCodeLoading": "requiredComponents",
+  "sitemapLocation": "sitemap.json",
+  "style": "v2"
+}

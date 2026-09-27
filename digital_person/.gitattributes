@@ -1,0 +1,6 @@
+# Shell scripts and server configs must stay LF — CRLF breaks execution on the
+# Linux deploy target (bash reads a trailing \r as part of every line).
+*.sh    text eol=lf
+*.bash  text eol=lf
+*.conf  text eol=lf
+deploy.sh text eol=lf

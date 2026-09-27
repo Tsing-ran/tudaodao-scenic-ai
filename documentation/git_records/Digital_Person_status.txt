@@ -1,0 +1,7 @@
+ M tests/accuracy_report.json
+ M webapp/src/hooks/useGuide.ts
+?? assets/avatar_backgrounds/review/sweet_bob_ditto_bg_flat.jpg
+?? assets/avatar_backgrounds/review/sweet_bob_ditto_bg_lingshan_v2.jpg
+?? avatar_candidates_staging/
+?? webapp/public/avatar_backgrounds/bg_flat.jpg
+?? webapp/public/avatar_backgrounds/bg_lingshan_v2.jpg

@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>灵境·导览 — AI 数字人导游</title>
+<style>
+  :root{
+    --ink:#211d18; --ink2:#5b5347; --paper:#f6f2e9; --paper2:#efe9db;
+    --jade:#2f8f6b; --jade-d:#247257; --gold:#c19a4e; --gold-l:#d8b970;
+    --line:rgba(33,29,24,.10); --glass:rgba(255,255,255,.62); --glass-d:rgba(28,24,20,.42);
+    --shadow:0 8px 30px rgba(33,29,24,.16); --r:18px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif;
+    color:var(--ink); background:#0c0b0a; overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .serif{font-family:"Songti SC","Noto Serif SC",Georgia,"Times New Roman",serif;}
+  /* 手机外的桌面：居中竖屏画框，演示更精致 */
+  .app{position:relative; width:100%; height:100%; max-width:480px; height:100dvh; max-height:100dvh;
+       overflow:hidden; background:#111;}
+  @media(min-width:520px){ .app{height:92vh; max-height:920px; border-radius:28px; box-shadow:0 30px 80px rgba(0,0,0,.55);} }
+
+  /* ── 数字人主视觉（全屏背景视频）── */
+  #video{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#0c0b0a; z-index:0;}
+  .scrim{position:absolute; inset:0; z-index:1; pointer-events:none;
+    background:linear-gradient(180deg, rgba(12,11,10,.55) 0%, rgba(12,11,10,0) 22% 60%, rgba(12,11,10,.78) 100%);}
+
+  /* ── 顶栏（玻璃）── */
+  .top{position:absolute; top:0; left:0; right:0; z-index:5; padding:calc(env(safe-area-inset-top) + 12px) 14px 12px;
+       display:flex; align-items:center; gap:10px;}
+  .brand{display:flex; align-items:center; gap:8px; color:#fff; text-shadow:0 1px 8px rgba(0,0,0,.4);}
+  .brand .logo{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:17px;
+    background:linear-gradient(135deg,var(--jade),var(--jade-d)); box-shadow:0 3px 10px rgba(47,143,107,.5);}
+  .brand b{font-size:16px; letter-spacing:.5px;}
+  .brand small{display:block;font-size:10px;opacity:.85;font-weight:400;letter-spacing:2px;}
+  .seg{margin-left:auto; display:flex; gap:6px;}
+  .chip-sel{position:relative;}
+  .chip-sel select{appearance:none; border:none; outline:none; cursor:pointer;
+    background:var(--glass); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+    color:var(--ink); font-size:12.5px; font-weight:600; padding:7px 26px 7px 12px; border-radius:20px;
+    box-shadow:var(--shadow);}
+  .chip-sel::after{content:"▾"; position:absolute; right:10px; top:50%; transform:translateY(-50%);
+    pointer-events:none; font-size:10px; color:var(--ink2);}
+
+  .status{position:absolute; top:calc(env(safe-area-inset-top) + 56px); left:14px; z-index:5;
+    display:flex; align-items:center; gap:6px; font-size:11px; color:#fff; opacity:.9;
+    background:rgba(0,0,0,.35); padding:4px 10px; border-radius:20px; backdrop-filter:blur(6px);}
+  .dot{width:7px;height:7px;border-radius:50%;background:#e0573e;}
+  .dot.on{background:#46c08a; box-shadow:0 0 0 4px rgba(70,192,138,.25);}
+
+  /* ── 字幕 + 状态标 ── */
+  .caption{position:absolute; left:14px; right:14px; bottom:158px; z-index:4;}
+  .tags{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;}
+  .tag{font-size:11px; font-weight:600; color:#fff; padding:4px 10px; border-radius:20px;
+    background:var(--glass-d); backdrop-filter:blur(8px); display:inline-flex; gap:4px; align-items:center;}
+  .tag.loc{background:rgba(193,154,78,.82);}
+  .tag.emo{background:rgba(47,143,107,.82);}
+  .tag.tm{background:rgba(28,24,20,.62);}
+  .bubble{background:var(--glass); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+    border:1px solid rgba(255,255,255,.5); border-radius:16px; padding:13px 15px; box-shadow:var(--shadow);
+    font-size:15.5px; line-height:1.62; color:var(--ink); max-height:34vh; overflow-y:auto;
+    white-space:pre-wrap; word-break:break-word;}
+  .bubble.empty{color:var(--ink2); font-size:14.5px;}
+
+  /* ── 底部输入坞 ── */
+  .dock{position:absolute; left:0; right:0; bottom:0; z-index:6;
+    padding:10px 12px calc(env(safe-area-inset-bottom) + 12px);
+    background:linear-gradient(180deg, rgba(246,242,233,0), rgba(246,242,233,.92) 38%);}
+  .sugg{display:flex; gap:7px; overflow-x:auto; padding:2px 2px 9px; scrollbar-width:none;}
+  .sugg::-webkit-scrollbar{display:none;}
+  .sugg button{flex:0 0 auto; border:1px solid var(--line); background:rgba(255,255,255,.85);
+    color:var(--ink); font-size:12.5px; font-weight:600; padding:7px 13px; border-radius:20px;
+    box-shadow:0 2px 8px rgba(33,29,24,.06); cursor:pointer; transition:.15s;}
+  .sugg button:active{transform:scale(.95); background:var(--jade); color:#fff; border-color:var(--jade);}
+  .bar{display:flex; align-items:center; gap:8px; background:#fff; border-radius:26px; padding:6px 6px 6px 16px;
+    box-shadow:0 6px 22px rgba(33,29,24,.14); border:1px solid var(--line);}
+  .bar input{flex:1; border:none; outline:none; background:transparent; font-size:15.5px; color:var(--ink); min-width:0;}
+  .bar input::placeholder{color:#9c9384;}
+  .icon{width:40px;height:40px;flex:0 0 auto;border:none;border-radius:50%;display:grid;place-items:center;
+    font-size:19px;cursor:pointer;background:var(--paper2);color:var(--ink);transition:.15s;}
+  .icon:disabled{opacity:.4;}
+  .icon:active{transform:scale(.92);}
+  .icon.go{background:linear-gradient(135deg,var(--jade),var(--jade-d));color:#fff;width:46px;height:46px;font-size:20px;
+    box-shadow:0 4px 14px rgba(47,143,107,.5);}
+  .icon.mic.recording{background:#e0573e;color:#fff;animation:pulse 1s infinite;}
+  .icon.mic.recognizing{background:var(--gold);color:#fff;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(224,87,62,.5)}50%{box-shadow:0 0 0 9px rgba(224,87,62,0)}}
+
+  /* 浮动：行程游记 */
+  .fab{position:absolute; right:14px; bottom:182px; z-index:6; width:48px; height:48px; border-radius:50%;
+    border:none; background:var(--glass); backdrop-filter:blur(12px); box-shadow:var(--shadow);
+    font-size:21px; display:grid; place-items:center; cursor:pointer;}
+  .fab:active{transform:scale(.92);}
+
+  /* ── 开场封面 ── */
+  .cover{position:absolute; inset:0; z-index:20; background:radial-gradient(120% 80% at 50% 0%, #1c3a30, #0c0b0a 70%);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; text-align:center; padding:30px;}
+  .cover .ring{width:128px;height:128px;border-radius:50%;display:grid;place-items:center;font-size:58px;
+    background:linear-gradient(135deg, rgba(47,143,107,.35), rgba(193,154,78,.3));
+    border:1px solid rgba(255,255,255,.25); box-shadow:0 0 60px rgba(47,143,107,.4);}
+  .cover h1{color:#f6f2e9; font-size:27px; letter-spacing:3px; font-weight:700;}
+  .cover p{color:#cfc7b6; font-size:13.5px; line-height:1.9; max-width:300px; letter-spacing:.5px;}
+  .cover .start{margin-top:8px; border:none; cursor:pointer; color:#0c0b0a; font-size:16px; font-weight:700;
+    padding:14px 40px; border-radius:30px; letter-spacing:4px;
+    background:linear-gradient(135deg,var(--gold-l),var(--gold)); box-shadow:0 10px 30px rgba(193,154,78,.45);}
+  .cover .feats{display:flex; gap:18px; color:#bdb4a2; font-size:11px; margin-top:6px;}
+  .cover .feats span{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:20px;}
+  .cover .feats small{font-size:10.5px;letter-spacing:1px;}
+  .spin{display:none; color:#cfc7b6; font-size:13px; align-items:center; gap:8px;}
+  .spin .l{width:16px;height:16px;border:2px solid rgba(255,255,255,.25);border-top-color:var(--gold-l);
+    border-radius:50%;animation:rot .8s linear infinite;}
+  @keyframes rot{to{transform:rotate(360deg)}}
+
+  /* ── 行程游记弹层 ── */
+  .sheet-mask{position:absolute; inset:0; z-index:30; background:rgba(12,11,10,.5); backdrop-filter:blur(3px);
+    display:none; align-items:flex-end;}
+  .sheet-mask.show{display:flex;}
+  .sheet{width:100%; background:var(--paper); border-radius:24px 24px 0 0; padding:8px 18px calc(env(safe-area-inset-bottom) + 22px);
+    max-height:80%; overflow-y:auto; box-shadow:0 -10px 40px rgba(0,0,0,.3);}
+  .sheet .grip{width:40px;height:4px;border-radius:4px;background:#d8d0bf;margin:8px auto 14px;}
+  .sheet h3{font-size:20px; text-align:center; margin-bottom:4px; letter-spacing:1px;}
+  .sheet .sub{font-size:12px;color:var(--ink2);text-align:center;margin-bottom:16px;}
+  .sheet .body{font-size:15px;line-height:1.85;color:var(--ink);white-space:pre-wrap;}
+  .toast{position:absolute;left:50%;bottom:230px;transform:translateX(-50%);z-index:40;
+    background:rgba(28,24,20,.9);color:#fff;font-size:13px;padding:9px 16px;border-radius:20px;
+    opacity:0;transition:.3s;pointer-events:none;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<div class="app">
+  <video id="video" autoplay playsinline></video>
+  <div class="scrim"></div>
+
+  <!-- 顶栏 -->
+  <div class="top">
+    <div class="brand">
+      <span class="logo">🪷</span>
+      <div><b class="serif">灵境·导览</b><small>SMART GUIDE</small></div>
+    </div>
+    <div class="seg">
+      <span class="chip-sel"><select id="scenic" onchange="onScenic()">
+        <option value="lingshan">灵山胜境</option>
+        <option value="nihuawan">拈花湾</option>
+        <option value="xihu">西湖</option>
+        <option value="huangshan">黄山</option>
+        <option value="gugong">故宫</option>
+      </select></span>
+      <span class="chip-sel"><select id="grp">
+        <option value="adult">独自/成人</option>
+        <option value="family_kids">亲子同行</option>
+        <option value="senior">陪伴长辈</option>
+        <option value="couple">情侣出游</option>
+      </select></span>
+    </div>
+  </div>
+  <div class="status"><span class="dot" id="dot"></span><span id="stat">未连接</span></div>
+
+  <!-- 行程游记 -->
+  <button class="fab" id="fab" onclick="openTrip()" disabled title="生成电子游记">📔</button>
+
+  <!-- 字幕区 -->
+  <div class="caption">
+    <div class="tags" id="tags"></div>
+    <div class="bubble empty" id="reply">连接后，慧昭会主动与您打招呼。可语音、打字提问，或拍照让我帮您定位讲解。</div>
+  </div>
+
+  <!-- 底部输入坞 -->
+  <div class="dock">
+    <div class="sugg" id="sugg"></div>
+    <div class="bar">
+      <input id="msg" placeholder="问点什么…" onkeydown="if(event.key==='Enter')ask()">
+      <button class="icon cam" id="cam" onclick="$('camfile').click()" disabled title="拍照定位">📷</button>
+      <button class="icon mic" id="mic" onclick="toggleVoice()" disabled title="语音提问">🎤</button>
+      <button class="icon go" id="send" onclick="ask()" disabled title="发送">➤</button>
+    </div>
+    <input type="file" id="camfile" accept="image/*" capture="environment" style="display:none" onchange="onPhoto(this.files[0])">
+  </div>
+
+  <!-- 开场封面 -->
+  <div class="cover" id="cover">
+    <div class="ring serif">慧</div>
+    <h1 class="serif">灵境 · 导览</h1>
+    <p>您的 AI 数字人导游「慧昭」，将为您实时讲解、个性化推荐路线、陪您看遍这片山水胜境。</p>
+    <div class="feats">
+      <span>🗣️<small>语音问答</small></span>
+      <span>📷<small>拍照定位</small></span>
+      <span>🧭<small>路线推荐</small></span>
+      <span>🪷<small>表情互动</small></span>
+    </div>
+    <button class="start" id="startBtn" onclick="connect()">开 始 游 览</button>
+    <div class="spin" id="spin"><span class="l"></span><span id="spinTxt">正在唤醒慧昭…</span></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- 行程游记弹层 -->
+  <div class="sheet-mask" id="tripMask" onclick="if(event.target===this)this.classList.remove('show')">
+    <div class="sheet">
+      <div class="grip"></div>
+      <h3 class="serif">📔 我的电子游记</h3>
+      <div class="sub" id="tripSub">慧昭为您记录这趟旅程</div>
+      <div class="body" id="tripBody">生成中…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const HOST=location.hostname;
+const BR='http://'+HOST+':9000';           // 桥接层
+const FLV=BR+'/stream.flv';                 // 经桥接反代的 HTTP-FLV（带 CORS）
+const sessionid='0';                        // RTMP 单路固定 sessionid
+let player=null, connected=false;
+
+const scenicName={lingshan:'灵山胜境',nihuawan:'拈花湾',xihu:'西湖',huangshan:'黄山',gugong:'故宫'};
+const SUGG=[
+  {t:'这里有什么必看的',q:'这个景区有哪些必看的景点和看点？'},
+  {t:'帮我推荐路线',q:'请根据我的同行情况，帮我推荐一条游览路线。'},
+  {t:'讲个历史故事',q:'给我讲一个这里的历史文化故事吧。'},
+  {t:'现在人多吗',q:'现在景区人多吗？怎么错开人流高峰？'},
+  {t:'附近吃什么',q:'附近有什么特色美食或值得一试的小吃？'},
+];
+function renderSugg(){ $('sugg').innerHTML=SUGG.map((s,i)=>`<button onclick="quick(${i})">${s.t}</button>`).join(''); }
+function quick(i){ $('msg').value=SUGG[i].q; ask(); }
+function gt(){ return $('grp').value; }
+function sc(){ return $('scenic').value; }
+
+function setStatus(t,on){ $('stat').textContent=t; $('dot').className='dot'+(on?' on':''); }
+function toast(t){ const e=$('toast'); e.textContent=t; e.classList.add('show'); setTimeout(()=>e.classList.remove('show'),1900); }
+function setTags(html){ $('tags').innerHTML=html; }
+function showReply(t,empty){ const r=$('reply'); r.textContent=t; r.classList.toggle('empty',!!empty); }
+
+// 打字机揭示（让最终回复有"在说"的流畅感）
+let typer=null;
+function typeReply(text){
+  if(typer) clearInterval(typer);
+  const r=$('reply'); r.classList.remove('empty'); r.textContent='';
+  let i=0; typer=setInterval(()=>{ r.textContent=text.slice(0,i++); r.scrollTop=r.scrollHeight;
+    if(i>text.length){ clearInterval(typer); typer=null; } }, 22);
+}
+
+// ── 连接：mpegts.js 播 HTTP-FLV ──
+function connect(){
+  $('startBtn').style.display='none'; $('spin').style.display='flex'; setStatus('连接中…',false);
+  if(window.mpegts){ startPlay(); return; }
+  const s=document.createElement('script');
+  s.src='http://'+HOST+':8010/mpegts-1.7.3.min.js';
+  s.onload=startPlay;
+  s.onerror=()=>{ $('spinTxt').textContent='播放器加载失败，请重试'; $('startBtn').style.display='block'; $('spin').style.display='none'; };
+  document.head.appendChild(s);
+}
+function startPlay(){
+  if(!window.mpegts||!mpegts.isSupported()){ $('spinTxt').textContent='浏览器不支持，请用 Chrome/微信'; return; }
+  player=mpegts.createPlayer({type:'flv',url:FLV,isLive:true,enableStashBuffer:false});
+  player.attachMediaElement($('video'));
+  player.load();
+  player.play().then(()=>{ $('video').muted=false; }).catch(()=>{});
+  connected=true; setStatus('已连接 '+scenicName[sc()],true);
+  ['send','mic','cam','fab'].forEach(id=>$(id).disabled=false);
+  setTimeout(()=>{ $('cover').style.display='none'; }, 700);
+  setTimeout(greet, 1600);
+}
+
+// ── 主动迎宾 ──
+let greeted=false;
+async function greet(){
+  if(greeted) return; greeted=true;
+  try{
+    const g=await (await fetch(`/trip/greeting?scenic_id=${sc()}&group_type=${gt()}`)).json();
+    if(g.text){ setTags('<span class="tag emo">🪷 主动迎宾</span>'); typeReply(g.text);
+      drive('/live/say',{sessionid,text:g.text,scenic_id:sc()}); }
+  }catch(e){}
+}
+function drive(path,body){ return fetch(BR+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).catch(()=>{}); }
+
+// ── 提问 → 桥接 /live/ask → 数字人开口 ──
+let busy=false;
+async function ask(){
+  const msg=$('msg').value.trim(); if(!msg||busy) return;
+  if(!connected){ toast('请先开始游览'); return; }
+  busy=true; $('send').disabled=true; setTags('<span class="tag">慧昭思考中…</span>'); showReply('…',true);
+  const t0=Date.now();
+  try{
+    const r=await fetch(BR+'/live/ask',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({sessionid,message:msg,scenic_id:sc(),group_type:gt()})});
+    const d=await r.json();
+    if(!r.ok){ showReply('出了点小状况：'+(d.detail||r.status)); return; }
+    const dt=((Date.now()-t0)/1000).toFixed(1);
+    typeReply(d.reply||'(无回答)');
+    setTags(`<span class="tag">${intentLabel(d.intent)}</span><span class="tag emo">${emoLabel(d.emotion)}</span><span class="tag tm">⏱ ${dt}s</span>`);
+    $('msg').value='';
+  }catch(e){ showReply('网络好像断开了，请重试'); }
+  finally{ busy=false; $('send').disabled=false; }
+}
+const INTENT={qa:'💬 问答',navigation:'🧭 指路',recommend:'✨ 推荐',empathy:'🤝 关怀',chitchat:'😊 闲聊'};
+const EMO={happy:'😊 开心',excited:'🤩 兴奋',neutral:'🙂 平静',calm:'🙂 平静',curious:'🤔 好奇',empathetic:'🥰 关切',apologetic:'🙏 抱歉',concerned:'🥺 关切'};
+function intentLabel(i){return INTENT[i]||'💬 问答';}
+function emoLabel(e){return EMO[e]||'🙂 平静';}
+
+function onScenic(){ if(connected){ setStatus('已连接 '+scenicName[sc()],true); greeted=false; greet(); } }
+
+// ── 语音输入 + 能量 VAD 自动断句 ──
+let micState='idle',mediaStream=null,mr=null,chunks=[],audioCtx=null,rafId=null,wantTr=false;
+function setMic(s){ micState=s; const b=$('mic'); b.className='icon mic'+(s==='idle'?'':' '+s);
+  b.textContent = s==='recognizing'?'⏳':(s==='recording'?'⏺':'🎤'); }
+async function toggleVoice(){
+  if(micState!=='idle'){ stopVoice(false); return; }
+  if(!connected){ toast('请先开始游览'); return; }
+  try{ mediaStream=await navigator.mediaDevices.getUserMedia({audio:{noiseSuppression:true,echoCancellation:true}}); }
+  catch(e){ toast('麦克风不可用（需 HTTPS 或 localhost）'); return; }
+  chunks=[]; wantTr=false; mr=new MediaRecorder(mediaStream);
+  mr.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); }; mr.onstop=onRecStop; mr.start();
+  setMic('listening'); toast('请说话，说完自动识别');
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  const src=audioCtx.createMediaStreamSource(mediaStream), an=audioCtx.createAnalyser();
+  an.fftSize=512; src.connect(an); const buf=new Uint8Array(an.fftSize);
+  const VOICE_TH=0.018,MIN_SPEECH=300,SILENCE_HOLD=800,MAX_MS=12000;
+  let spoke=false,sStart=0,lastV=performance.now(),t0=performance.now();
+  (function loop(){
+    if(micState==='idle')return;
+    an.getByteTimeDomainData(buf); let sum=0; for(let i=0;i<buf.length;i++){const v=(buf[i]-128)/128;sum+=v*v;}
+    const rms=Math.sqrt(sum/buf.length),now=performance.now();
+    if(rms>VOICE_TH){ lastV=now; if(!spoke){spoke=true;sStart=now;setMic('recording');} }
+    if(spoke&&(now-sStart)>MIN_SPEECH&&(now-lastV)>SILENCE_HOLD){ stopVoice(true); return; }
+    if((now-t0)>MAX_MS){ stopVoice(spoke); return; }
+    rafId=requestAnimationFrame(loop);
+  })();
+}
+function stopVoice(tr){ wantTr=tr; if(rafId){cancelAnimationFrame(rafId);rafId=null;}
+  if(audioCtx){audioCtx.close().catch(()=>{});audioCtx=null;}
+  if(mr&&mr.state!=='inactive')mr.stop(); else cleanupMic(); }
+function cleanupMic(){ if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;} }
+async function onRecStop(){
+  cleanupMic();
+  if(!wantTr||!chunks.length){ setMic('idle'); return; }
+  setMic('recognizing'); setTags('<span class="tag">识别语音…</span>');
+  const fd=new FormData(); fd.append('file',new Blob(chunks,{type:'audio/webm'}),'voice.webm'); fd.append('scenic_id',sc());
+  try{ const d=await (await fetch('/asr',{method:'POST',body:fd})).json(); setMic('idle');
+    if(d.text&&d.text.trim()){ $('msg').value=d.text.trim(); ask(); }
+    else { setTags(''); toast('没听清，请再说一次'); } }
+  catch(e){ setMic('idle'); toast('识别失败'); }
+}
+
+// ── 拍照视觉定位 + 口语指路 ──
+async function onPhoto(file){
+  if(!file)return; if(!connected){ toast('请先开始游览'); return; }
+  $('cam').disabled=true; setTags('<span class="tag">📷 识别画面…</span>'); showReply('正在看您拍的画面…',true);
+  const t0=Date.now();
+  try{
+    const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file);});
+    const b64=dataUrl.slice(dataUrl.indexOf(',')+1); const m=/data:image\/(\w+);/.exec(dataUrl); const fmt=m?m[1]:'jpeg';
+    const r=await fetch('/chat/image',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({session_id:'app',scenic_id:sc(),image_b64:b64,image_format:fmt,
+        question:'我面前是什么？帮我定位、讲解，并指引我接下来去哪。'})});
+    const d=await r.json();
+    if(!r.ok){ showReply('识别出错：'+(d.detail||r.status)); return; }
+    const dt=((Date.now()-t0)/1000).toFixed(1);
+    typeReply(d.reply||'(无结果)');
+    setTags((d.location?`<span class="tag loc">📍 ${d.location}</span>`:'<span class="tag">未定位</span>')
+      +`<span class="tag emo">${emoLabel(d.emotion)}</span><span class="tag tm">⏱ ${dt}s</span>`);
+    if(d.reply) drive('/live/say',{sessionid,text:d.reply,scenic_id:sc()});
+  }catch(e){ showReply('识别失败：'+e.message); }
+  finally{ $('cam').disabled=false; $('camfile').value=''; }
+}
+
+// ── 行程游记 ──
+async function openTrip(){
+  $('tripMask').classList.add('show'); $('tripSub').textContent=scenicName[sc()]+' · 慧昭为您记录';
+  $('tripBody').textContent='慧昭正在为您回顾这趟旅程…';
+  try{
+    const d=await (await fetch(`/trip/summary?session_id=app&scenic_id=${sc()}`)).json();
+    $('tripBody').textContent=d.summary||d.text||'这趟旅程才刚开始，多和慧昭聊聊、多拍几张照片，游记会更精彩哦～';
+  }catch(e){ $('tripBody').textContent='游记生成失败，请稍后再试。'; }
+}
+
+renderSugg();
+</script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+@startuml 03b_RAG改造原理
+' 注意：本图刻意不设 title（@startuml 后的名称仅为文件名，不渲染为图上标题）
+!include _style.puml
+' 本图较长，压缩行间距使其单页放得下（仍 ≤2880px 宽，保证五号）
+skinparam ranksep 34
+skinparam nodesep 38
+skinparam rectangle {
+  RoundCorner 10
+}
+skinparam ArrowThickness 1.1
+
+' 离线：知识库构建（插拔式，换库不换码）
+package "知识库构建（离线 · 换库不换码）" as KB {
+  rectangle "景区文档\n解析 → 语义分块" as DOC #EAF2FB
+  rectangle "BGE-M3\n向量化" as EMB #EAF2FB
+  database "ChromaDB\n景区命名空间隔离" as CHROMA #E8F8F5
+  DOC --> EMB
+  EMB --> CHROMA
+}
+
+' 在线：增强问答主链
+rectangle "游客提问 query\n同行人 · 自身情况 · 景区 · 语言" as IN #EAF2FB
+
+rectangle "答案缓存 LRU\n画像隔离缓存键 · 命中约 5 毫秒" as CACHE #FDF2E9
+rectangle "命中\n直接返回" as HIT #EAF2FB
+rectangle "多智能体 Orchestrator\n意图分类（问答 / 导航 / 推荐 / 共情 / 闲聊）\n规则快筛 · qwen-flash 兜底" as ORC #FDF2E9
+rectangle "查询改写 Query Rewrite\n指代消解 · qwen-flash · 仅必要时" as REW #FDF2E9
+
+package "混合检索与重排" as RET {
+  rectangle "稠密检索\nBGE-M3 向量余弦 Top-K" as DENSE #FDF2E9
+  rectangle "稀疏检索\nBM25 关键词 Top-K" as SPARSE #FDF2E9
+  rectangle "RRF 融合 → BGE-Reranker v2-m3 精排 Top-N\n置信度阈值判定（低于阈值走无答案兜底 · 防幻觉）" as RERANK #FDF2E9
+  DENSE --> RERANK
+  SPARSE --> RERANK
+}
+
+rectangle "情境感知 Prompt 组装\n景区知识、同行人格、自身情况（因人而异）\n实时客流与天气、意图指令、语言、口播与情绪规则" as PROMPT #FDF2E9
+
+rectangle "按意图路由 LLM\n事实问答走 qwen-plus（守准确率） · 生成性意图走 qwen-flash（降时延）" as LLM #FDF2E9
+
+rectangle "情绪抽取 [情绪] · 句子级流式输出（首句即驱动）\n回复 / 情绪 / 意图 / 来源 → 驱动数字人（TTS 与口型） · 会话落库" as SINK #EAF2FB
+
+' 数据流
+IN --> CACHE
+CACHE --> HIT : 命中
+CACHE --> ORC : 未命中
+ORC --> REW : 需检索
+ORC --> PROMPT : 闲聊
+REW --> DENSE
+CHROMA ..> DENSE
+RERANK --> PROMPT
+PROMPT --> LLM
+LLM --> SINK
+
+legend left
+<back:#EAF2FB>     </back> 通用 RAG 环节
+<back:#FDF2E9>     </back> 本系统自主设计环节
+endlegend
+@enduml

@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>景区数字人 · 后端功能测试台</title>
+<style>
+  :root{ --pri:#2563eb; --pri-d:#1e40af; --bg:#f1f5f9; --card:#fff; --line:#e2e8f0; --ok:#16a34a; --err:#dc2626; --muted:#64748b; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{ margin:0; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+        background:var(--bg); color:#0f172a; font-size:15px; line-height:1.5; padding-bottom:40px; }
+  header{ position:sticky; top:0; z-index:10; background:var(--pri); color:#fff; padding:12px 14px;
+          box-shadow:0 2px 8px rgba(0,0,0,.15); }
+  header h1{ margin:0 0 8px; font-size:16px; font-weight:700; }
+  .cfg{ display:flex; gap:6px; flex-wrap:wrap; }
+  .cfg input,.cfg select{ flex:1; min-width:120px; padding:7px 9px; border:none; border-radius:7px; font-size:13px; }
+  main{ max-width:640px; margin:0 auto; padding:12px; }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:12px; margin-bottom:12px; overflow:hidden; }
+  .card>summary{ list-style:none; padding:13px 14px; font-weight:600; cursor:pointer; display:flex;
+                 align-items:center; justify-content:space-between; user-select:none; }
+  .card>summary::-webkit-details-marker{ display:none; }
+  .card>summary .tag{ font-size:11px; color:var(--muted); font-weight:400; background:var(--bg); padding:2px 7px; border-radius:6px; }
+  .body{ padding:0 14px 14px; }
+  label{ display:block; font-size:12px; color:var(--muted); margin:8px 0 3px; }
+  input[type=text],textarea,select{ width:100%; padding:9px 10px; border:1px solid var(--line);
+        border-radius:8px; font-size:14px; font-family:inherit; }
+  textarea{ resize:vertical; min-height:54px; }
+  .row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .row>*{ flex:1; }
+  button{ background:var(--pri); color:#fff; border:none; padding:10px 14px; border-radius:8px;
+          font-size:14px; font-weight:600; cursor:pointer; min-height:42px; }
+  button:active{ background:var(--pri-d); }
+  button.sec{ background:#fff; color:var(--pri); border:1.5px solid var(--pri); }
+  button.rec{ background:var(--err); }
+  .chk{ display:flex; align-items:center; gap:6px; flex:0 0 auto; font-size:13px; color:var(--muted); }
+  .chk input{ width:18px; height:18px; }
+  .out{ margin-top:10px; background:#0f172a; color:#e2e8f0; border-radius:8px; padding:10px 12px;
+        font-size:12.5px; white-space:pre-wrap; word-break:break-word; max-height:300px; overflow:auto;
+        font-family:ui-monospace,Menlo,Consolas,monospace; display:none; }
+  .out.show{ display:block; }
+  .pills{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .pill{ font-size:12px; padding:3px 9px; border-radius:20px; background:#e0e7ff; color:var(--pri-d); }
+  .pill.emo{ background:#fef3c7; color:#92400e; }
+  .hint{ font-size:11.5px; color:var(--muted); margin-top:6px; }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  img.preview{ max-width:100%; border-radius:8px; margin-top:8px; display:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏯 景区数字人 · 后端功能测试台</h1>
+  <div class="cfg">
+    <input type="text" id="base" placeholder="API 地址">
+    <select id="scenic">
+      <option value="lingshan">灵山胜境</option>
+      <option value="nihuawan">拈花湾</option>
+      <option value="xihu">西湖</option>
+      <option value="huangshan">黄山</option>
+      <option value="gugong">故宫</option>
+    </select>
+  </div>
+</header>
+<main>
+
+  <!-- 文本问答 -->
+  <details class="card" open>
+    <summary>💬 文本问答 <span class="tag">POST /chat</span></summary>
+    <div class="body">
+      <textarea id="q" placeholder="问点什么，如：灵山大佛有多高？">灵山大佛有多高？</textarea>
+      <div class="row" style="margin-top:8px">
+        <label class="chk"><input type="checkbox" id="stream" checked>流式</label>
+        <label class="chk"><input type="checkbox" id="fast">fast</label>
+        <select id="group" style="flex:2">
+          <option value="adult">成人</option>
+          <option value="family_kids">亲子</option>
+          <option value="senior">老年</option>
+          <option value="couple">情侣</option>
+        </select>
+      </div>
+      <button style="margin-top:8px" onclick="ask()">发送</button>
+      <div id="chatPills" class="pills"></div>
+      <div class="out" id="chatOut"></div>
+    </div>
+  </details>
+
+  <!-- 语音问答 -->
+  <details class="card">
+    <summary>🎤 语音识别 <span class="tag">POST /asr</span></summary>
+    <div class="body">
+      <div class="row">
+        <button id="recBtn" onclick="toggleRec()">● 按住录音</button>
+        <button class="sec" onclick="document.getElementById('audioFile').click()">选音频文件</button>
+      </div>
+      <input type="file" id="audioFile" accept="audio/*" style="display:none" onchange="asrFile(this.files[0])">
+      <p class="hint">手机浏览器录音需 HTTPS 或 localhost；http 公网访问请用「选音频文件」。识别后自动填入上方问答框。</p>
+      <div class="out" id="asrOut"></div>
+    </div>
+  </details>
+
+  <!-- 拍照问答 -->
+  <details class="card">
+    <summary>📷 拍照问答（多模态）<span class="tag">POST /chat/image</span></summary>
+    <div class="body">
+      <input type="file" id="imgFile" accept="image/*" capture="environment" onchange="pickImg(this.files[0])">
+      <img class="preview" id="imgPrev">
+      <label>问题</label>
+      <input type="text" id="imgQ" value="这是哪个景点？请介绍一下">
+      <button style="margin-top:8px" onclick="askImg()">识别并问答</button>
+      <div class="out" id="imgOut"></div>
+    </div>
+  </details>
+
+  <!-- 数字人形象配置 -->
+  <details class="card">
+    <summary>🧑‍🎨 数字人形象配置 <span class="tag">/digital-human</span></summary>
+    <div class="body">
+      <button class="sec" onclick="loadPresets()">加载形象/音色选项</button>
+      <label>形象</label><select id="avatar"></select>
+      <label>音色</label><select id="voice"></select>
+      <div class="row" style="margin-top:8px">
+        <button onclick="getConfig()">读取当前</button>
+        <button onclick="putConfig()">保存配置</button>
+      </div>
+      <div class="out" id="dhOut"></div>
+    </div>
+  </details>
+
+  <!-- 数据大屏 -->
+  <details class="card">
+    <summary>📊 数据大屏 <span class="tag">/analytics</span></summary>
+    <div class="body">
+      <div class="grid2">
+        <button class="sec" onclick="ana('dashboard')">概览</button>
+        <button class="sec" onclick="ana('hot-topics')">热门问答</button>
+        <button class="sec" onclick="ana('sentiment-trend')">情感趋势</button>
+        <button class="sec" onclick="ana('knowledge-gaps')">知识盲区</button>
+        <button class="sec" onclick="ana('alerts')">情绪预警</button>
+        <button class="sec" onclick="ana('conversations')">对话记录</button>
+      </div>
+      <div class="out" id="anaOut"></div>
+    </div>
+  </details>
+
+  <!-- 知识库 -->
+  <details class="card">
+    <summary>📚 知识库 <span class="tag">/kb</span></summary>
+    <div class="body">
+      <button class="sec" onclick="kbList()">查看已入库景区</button>
+      <div class="out" id="kbOut"></div>
+    </div>
+  </details>
+
+  <!-- 健康/桥接 -->
+  <details class="card">
+    <summary>🩺 健康检查 / 桥接 <span class="tag">/health · /live</span></summary>
+    <div class="body">
+      <div class="row">
+        <button class="sec" onclick="health()">后端 /health</button>
+        <button class="sec" onclick="bridge()">桥接 /live/health</button>
+      </div>
+      <label>桥接地址（本地数字人联调用）</label>
+      <input type="text" id="bridgeBase" placeholder="http://192.168.x.x:9000">
+      <div class="out" id="sysOut"></div>
+    </div>
+  </details>
+
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+// 默认 API 地址：被后端托管时同源；否则回落 ECS
+$('base').value = location.origin.startsWith('http') ? location.origin : 'http://116.62.136.211:8000';
+const base = () => $('base').value.replace(/\/$/, '');
+const scenic = () => $('scenic').value;
+function show(el, data){ el.classList.add('show'); el.textContent = typeof data==='string'?data:JSON.stringify(data,null,2); }
+async function jpost(path, body){ const r = await fetch(base()+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); return r.json(); }
+async function jget(path){ const r = await fetch(base()+path); return r.json(); }
+
+// ── 文本问答（含流式 SSE）─────────────────────────────
+function ask(){
+  const out=$('chatOut'), pills=$('chatPills'); pills.innerHTML='';
+  out.classList.add('show'); out.textContent='请求中…';
+  const payload={session_id:'webtest',message:$('q').value,scenic_id:scenic(),
+                 fast:$('fast').checked,group_type:$('group').value,stream:$('stream').checked};
+  const t0=Date.now();
+  // 非流式
+  if(!$('stream').checked){
+    jpost('/chat',payload).then(d=>{
+      const dt=((Date.now()-t0)/1000).toFixed(2);
+      pills.innerHTML=`<span class="pill">意图 ${d.intent||'-'}</span><span class="pill emo">情绪 ${d.emotion||'-'}</span>`
+        +(d.from_cache?'<span class="pill">缓存</span>':'')+`<span class="pill">⏱ ${dt}s</span>`;
+      show(out,d.reply||d);
+    }); return;
+  }
+  // 流式：XHR + onprogress 增量解析（移动端兼容性优于 fetch streaming）
+  let firstAt=null, processed=0, pending='', shown='', typing=false;
+  out.textContent='';
+  function tw(){ if(shown.length<pending.length){ shown=pending.slice(0,shown.length+1);
+    out.textContent=shown; out.scrollTop=out.scrollHeight; setTimeout(tw,22); } else typing=false; }
+  function feed(t){ pending+=t; if(!typing){ typing=true; tw(); } }
+  function timing(){ const tot=((Date.now()-t0)/1000).toFixed(2);
+    const fst=firstAt?((firstAt-t0)/1000).toFixed(2):'-';
+    let p=pills.querySelector('.tm'); if(!p){ p=document.createElement('span'); p.className='pill tm'; pills.appendChild(p); }
+    p.textContent=`⏱ 首句 ${fst}s / 总 ${tot}s`; }
+  const xhr=new XMLHttpRequest();
+  xhr.open('POST', base()+'/chat');
+  xhr.setRequestHeader('Content-Type','application/json');
+  xhr.onprogress=()=>{
+    const full=xhr.responseText; let nl;
+    while((nl=full.indexOf('\n\n',processed))>=0){
+      const block=full.slice(processed,nl); processed=nl+2;
+      const line=block.split('\n').find(l=>l.startsWith('data:')); if(!line) continue;
+      let evt; try{ evt=JSON.parse(line.slice(5).trim()); }catch(e){ continue; }
+      if(evt.type==='intent') pills.insertAdjacentHTML('afterbegin',`<span class="pill">意图 ${evt.label}</span>`);
+      else if(evt.type==='emotion') pills.insertAdjacentHTML('beforeend',`<span class="pill emo">情绪 ${evt.value}</span>`);
+      else if(evt.type==='sentence'){ if(!firstAt) firstAt=Date.now(); feed(evt.text); timing(); }
+    }
+  };
+  xhr.onload=()=>{ timing(); if(!pending) show(out,xhr.responseText||'（无内容）'); };
+  xhr.onerror=()=>show(out,'请求失败（检查 API 地址 / 网络）');
+  xhr.send(JSON.stringify(payload));
+}
+
+// ── 语音识别 ─────────────────────────────
+let mr,chunks=[],recing=false;
+async function toggleRec(){
+  if(recing){ mr.stop(); return; }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    mr=new MediaRecorder(stream); chunks=[];
+    mr.ondataavailable=e=>chunks.push(e.data);
+    mr.onstop=()=>{ stream.getTracks().forEach(t=>t.stop()); asrFile(new Blob(chunks,{type:'audio/webm'}),'rec.webm'); };
+    mr.start(); recing=true; $('recBtn').textContent='■ 停止录音'; $('recBtn').classList.add('rec');
+  }catch(e){ show($('asrOut'),'录音不可用（需 HTTPS 或 localhost）：'+e.message); }
+}
+async function asrFile(blob,name){
+  recing=false; $('recBtn').textContent='● 按住录音'; $('recBtn').classList.remove('rec');
+  if(!blob) return; show($('asrOut'),'识别中…');
+  const fd=new FormData(); fd.append('file',blob,name||blob.name||'audio.webm'); fd.append('scenic_id',scenic());
+  try{
+    const r=await fetch(base()+'/asr',{method:'POST',body:fd}); const d=await r.json();
+    show($('asrOut'),d); if(d.text){ $('q').value=d.text; }
+  }catch(e){ show($('asrOut'),'ASR 失败：'+e.message+'\n（ECS 未部署 ASR，请把 API 地址切到本地后端）'); }
+}
+
+// ── 拍照问答 ─────────────────────────────
+let imgB64='',imgFmt='jpeg';
+function pickImg(f){ if(!f)return; const fr=new FileReader();
+  fr.onload=()=>{ const d=fr.result; $('imgPrev').src=d; $('imgPrev').style.display='block';
+    imgB64=d.split(',')[1]; imgFmt=(f.type.split('/')[1]||'jpeg').replace('jpg','jpeg'); }; fr.readAsDataURL(f); }
+async function askImg(){ if(!imgB64){ show($('imgOut'),'请先拍照/选图'); return; }
+  show($('imgOut'),'识别中…');
+  const d=await jpost('/chat/image',{session_id:'webtest',scenic_id:scenic(),image_b64:imgB64,image_format:imgFmt,question:$('imgQ').value});
+  show($('imgOut'),d); }
+
+// ── 形象配置 ─────────────────────────────
+async function loadPresets(){ const d=await jget('/digital-human/presets');
+  $('avatar').innerHTML=d.avatars.map(a=>`<option value="${a.id}">${a.name}（${a.style}）</option>`).join('');
+  $('voice').innerHTML=d.voices.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+  show($('dhOut'),'已加载 '+d.avatars.length+' 形象 / '+d.voices.length+' 音色'); }
+async function getConfig(){ const d=await jget('/digital-human/config?scenic_id='+scenic());
+  if(d.avatar_id) $('avatar').value=d.avatar_id; if(d.voice_id) $('voice').value=d.voice_id; show($('dhOut'),d); }
+async function putConfig(){ const av=$('avatar'),vo=$('voice');
+  const d=await jpost('/digital-human/config',{scenic_id:scenic(),avatar_id:av.value,
+    avatar_name:av.selectedOptions[0]?.text||'',voice_id:vo.value,voice_name:vo.selectedOptions[0]?.text||''});
+  show($('dhOut'),d); }
+
+// ── 数据大屏 ─────────────────────────────
+async function ana(kind){ show($('anaOut'),'加载中…');
+  const d=await jget('/analytics/'+kind+'?scenic_id='+scenic()); show($('anaOut'),d); }
+
+// ── 知识库 / 系统 ─────────────────────────────
+async function kbList(){ show($('kbOut'),await jget('/kb/list')); }
+async function health(){ try{ show($('sysOut'),await jget('/health')); }catch(e){ show($('sysOut'),'失败：'+e.message); } }
+async function bridge(){ const b=$('bridgeBase').value.replace(/\/$/,''); if(!b){ show($('sysOut'),'请填桥接地址'); return; }
+  try{ const r=await fetch(b+'/live/health'); show($('sysOut'),await r.json()); }catch(e){ show($('sysOut'),'桥接不可达：'+e.message); } }
+</script>
+</body>
+</html>

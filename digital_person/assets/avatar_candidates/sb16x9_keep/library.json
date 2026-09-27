@@ -1,0 +1,67 @@
+{
+  "_note": "万相抽奖产出的景区专属导览数字人身份库。keep_0N=抽奖留存原图；dh_<scenic>=按景区归档(景区制 id，与对外名解耦)。这是身份库真值源，供 ditto_avatars 注册 + 桥接 AVATAR_MAP + _AVATAR_PRESETS + 各景区背景变体生成时引用。6 张为 6 个不同身份(万相不锁脸)；换装轴(同人换衣)需单独从 dh_lingshan 走 InstantID 锁脸。对外名 = 「<景区简称>AI智能导览数字人」(去人名化，与后端 SCENIC_CONFIG.guide_name 一致)。黄山/故宫沿用现有身份库脸，不在此 6 张内。",
+  "source": "wanx2.1-t2i-plus 1280x720, scripts/gen_sweet_bob_16x9.py",
+  "naming_scheme": "<景区简称>AI智能导览数字人",
+  "identities": [
+    {
+      "id": "dh_lingshan",
+      "display": "灵山AI智能导览数字人",
+      "scenic": "lingshan",
+      "src": "dh_lingshan.png",
+      "keep": "keep_01",
+      "main": true,
+      "gender": "female",
+      "style": "sweet"
+    },
+    {
+      "id": "dh_nihuawan",
+      "display": "拈花湾AI智能导览数字人",
+      "scenic": "nihuawan",
+      "src": "dh_nihuawan.png",
+      "keep": "keep_02",
+      "main": false,
+      "gender": "female",
+      "style": "sweet"
+    },
+    {
+      "id": "dh_xihu",
+      "display": "西湖AI智能导览数字人",
+      "scenic": "xihu",
+      "src": "dh_xihu.png",
+      "keep": "keep_03",
+      "main": false,
+      "gender": "female",
+      "style": "sweet"
+    },
+    {
+      "id": "dh_mogaoku",
+      "display": "莫高窟AI智能导览数字人",
+      "scenic": "mogaoku",
+      "src": "dh_mogaoku.png",
+      "keep": "keep_04",
+      "main": false,
+      "gender": "female",
+      "style": "sweet"
+    },
+    {
+      "id": "dh_zhangjiajie",
+      "display": "张家界AI智能导览数字人",
+      "scenic": "zhangjiajie",
+      "src": "dh_zhangjiajie.png",
+      "keep": "keep_05",
+      "main": false,
+      "gender": "female",
+      "style": "sweet"
+    },
+    {
+      "id": "dh_bingmayong",
+      "display": "兵马俑AI智能导览数字人",
+      "scenic": "bingmayong",
+      "src": "dh_bingmayong.png",
+      "keep": "keep_06",
+      "main": false,
+      "gender": "female",
+      "style": "sweet"
+    }
+  ]
+}

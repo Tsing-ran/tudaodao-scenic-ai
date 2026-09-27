@@ -1,0 +1,18 @@
+ M app.py
+ M avatars/audio_features/base_asr.py
+ M avatars/base_avatar.py
+ M server/routes.py
+ M streamout/rtmp.py
+ M tts/qwentts.py
+ M web/asr/main.js
+ M web/index-en.html
+ M web/index.html
+?? avatars/audio_features/base_asr.py.bak_idletimeout
+?? avatars/ditto_avatar.py
+?? avatars/ditto_avatar.py.bak.maxsize
+?? avatars/ditto_avatar.py.bak.pace
+?? avatars/ditto_avatar.py.bak0615
+?? avatars/ditto_avatar.py.bak_lipscale
+?? server/routes.py.bak0615
+?? server/routes.py.bak_lipscale
+?? tts/ttsbackend.py

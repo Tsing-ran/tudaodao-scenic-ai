@@ -1,0 +1,44 @@
+{
+  "_note": "L1 高频问答视频缓存清单。命中→前端直接播 clip（0 GPU/0 LLM/<0.5s）。clip 为 _placeholder.mp4 的是占位，待 scripts/prerender_faq.py 在 GPU 上渲染真·会说话片后替换。match=触发短语(归一化后子串命中即算高频问答)。",
+  "scenics": {
+    "lingshan": [
+      {
+        "id": "dafo_height",
+        "answer": "灵山大佛高八十八米，是世界最高的露天青铜释迦牟尼立像。佛像主体七十九米，加上莲花座一共八十八米，气势非常恢宏。",
+        "emotion": "excited",
+        "clip": "/faq/lingshan_dafo_height.mp4",
+        "match": [
+          "大佛多高",
+          "大佛有多高",
+          "大佛高",
+          "佛像多高",
+          "灵山大佛多高"
+        ]
+      },
+      {
+        "id": "ticket",
+        "answer": "灵山胜境的门票现价两百一十元，建议提前在官方小程序或网上购票，能省去现场排队。一米四以下儿童免票哦。",
+        "emotion": "happy",
+        "clip": "/faq/lingshan_ticket.mp4",
+        "match": [
+          "门票多少",
+          "票价",
+          "多少钱",
+          "门票价格",
+          "怎么买票"
+        ]
+      },
+      {
+        "id": "jiulong",
+        "answer": "九龙灌浴是灵山的经典景观，每天有固定的音乐喷泉表演：随着音乐响起，莲花缓缓绽放，托起太子像，九条龙喷出泉水为其沐浴，场面非常震撼，千万别错过。",
+        "emotion": "excited",
+        "clip": "/faq/lingshan_jiulong.mp4",
+        "match": [
+          "九龙灌浴",
+          "灌浴表演",
+          "喷泉表演"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,67 @@
+/* ============================================================
+   灵境·导览 — 全局设计系统（token + 基础样式）
+   原则：克制、统一、留白。遵循微信官方设计规范 + 自研精致 UI。
+   ============================================================ */
+page {
+  /* —— 品牌渐变主色（通用现代：靛蓝 → 青绿）—— */
+  --brand: #4f6ef7;
+  --brand-2: #16b7a6;
+  --brand-grad: linear-gradient(135deg, #5b78ff 0%, #16b7a6 100%);
+
+  /* —— 中性文本（主/次/占位，对底 ≥4.5:1）—— */
+  --ink: #14161f;
+  --ink-2: #5a6072;
+  --ink-3: #9aa0b0;
+  --on-dark: rgba(255, 255, 255, 0.96);
+  --on-dark-2: rgba(255, 255, 255, 0.72);
+
+  /* —— 背景 / 玻璃 / 描边 —— */
+  --bg: #f5f6fa;
+  --card: #ffffff;
+  --glass: rgba(255, 255, 255, 0.66);
+  --glass-dark: rgba(20, 22, 31, 0.42);
+  --hairline: rgba(20, 22, 31, 0.08);
+
+  /* —— 语义色 —— */
+  --danger: #f0563e;
+  --ok: #1fc28a;
+  --gold: #f2b03d;
+
+  /* —— 圆角 —— */
+  --r-sm: 12rpx;
+  --r-md: 20rpx;
+  --r-lg: 28rpx;
+  --r-pill: 999rpx;
+
+  /* —— 阴影 —— */
+  --sh-1: 0 4rpx 16rpx rgba(20, 22, 31, 0.08);
+  --sh-2: 0 12rpx 40rpx rgba(20, 22, 31, 0.16);
+  --sh-brand: 0 10rpx 28rpx rgba(79, 110, 247, 0.36);
+
+  /* —— 统一动效缓动 —— */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Noto Sans CJK SC", sans-serif;
+  color: var(--ink);
+  background: #0c0e14;
+  -webkit-font-smoothing: antialiased;
+}
+
+view, text, input, scroll-view, image, button { box-sizing: border-box; }
+
+/* 去掉 button 默认外观（统一按钮态由我们自己控） */
+button { padding: 0; margin: 0; line-height: normal; background: transparent; }
+button::after { border: none; }
+
+/* 通用按压反馈 */
+.tap { transition: transform 0.12s var(--ease), opacity 0.12s var(--ease); }
+.tap:active { transform: scale(0.94); opacity: 0.9; }
+
+/* 文本省略 */
+.ellipsis { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* 通用淡入 */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16rpx); } to { opacity: 1; transform: none; } }
+.fade-up { animation: fadeUp 0.36s var(--ease) both; }
+
+@keyframes spin { to { transform: rotate(360deg); } }

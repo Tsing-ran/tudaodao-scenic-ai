@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<!-- 图：Ditto 直播流水线（竖向流 · Visio 风格）。源文件。渲染宽≈2000 → {width≈69%}。 -->
+<html lang="zh"><head><meta charset="utf-8"><link rel="stylesheet" href="_kit.css">
+<style>
+  .fig{width:2000px;}
+  .flow{display:flex;flex-direction:column;align-items:center;}
+  .st{width:100%;border-radius:16px;border:3px solid var(--c);background:var(--tint);
+    box-shadow:4px 6px 12px rgba(60,70,85,0.20);padding:22px 36px;
+    display:flex;flex-direction:column;gap:6px;}
+  .st .t{font-size:60px;font-weight:700;color:var(--c);white-space:nowrap;}
+  .st .l{font-size:54px;color:#222834;line-height:1.3;white-space:nowrap;}
+  .down svg{display:block;}
+  .note{margin-top:30px;width:100%;border-left:14px solid #16a085;background:#e8f8f5;border-radius:10px;
+    padding:24px 34px;display:flex;flex-direction:column;gap:8px;}
+  .note .nl{font-size:52px;color:#1d5e4f;line-height:1.32;white-space:nowrap;}
+</style></head><body>
+<div class="fig"><div class="flow">
+
+  <div class="st c-purple"><div class="t">Qwen-TTS Realtime</div><div class="l">输出 16kHz 音频流</div></div>
+  <div class="adown"><svg width="50" height="48"><line x1="25" y1="2" x2="25" y2="30" stroke="#5a6473" stroke-width="6"/><polygon points="25,48 14,28 36,28" fill="#5a6473"/></svg></div>
+  <div class="st c-orange"><div class="t">音频帧队列</div><div class="l">20ms / 帧；无语音时注入静音帧</div></div>
+  <div class="adown"><svg width="50" height="48"><line x1="25" y1="2" x2="25" y2="30" stroke="#5a6473" stroke-width="6"/><polygon points="25,48 14,28 36,28" fill="#5a6473"/></svg></div>
+  <div class="st c-blue"><div class="t">feeder 线程</div><div class="l">6480 样本滑动窗口 → SDK 推理</div><div class="l">SDK 内部队列背压：生产快于消费即阻塞</div></div>
+  <div class="adown"><svg width="50" height="48"><line x1="25" y1="2" x2="25" y2="30" stroke="#5a6473" stroke-width="6"/><polygon points="25,48 14,28 36,28" fill="#5a6473"/></svg></div>
+  <div class="st c-teal"><div class="t">Ditto SDK</div><div class="l">运动扩散与隐式关键点 warp，渲染出帧</div></div>
+  <div class="adown"><svg width="50" height="48"><line x1="25" y1="2" x2="25" y2="30" stroke="#5a6473" stroke-width="6"/><polygon points="25,48 14,28 36,28" fill="#5a6473"/></svg></div>
+  <div class="st c-blue"><div class="t">emitter 线程</div><div class="l">每帧画面与对应音频逐帧配对 → RTMP 推流</div></div>
+  <div class="adown"><svg width="50" height="48"><line x1="25" y1="2" x2="25" y2="30" stroke="#5a6473" stroke-width="6"/><polygon points="25,48 14,28 36,28" fill="#5a6473"/></svg></div>
+  <div class="st c-green"><div class="t">SRS → HTTP-FLV / HLS → 前端</div></div>
+
+  <div class="note">
+    <div class="nl">静音也喂给模型 → Ditto 自生成待机微动</div>
+    <div class="nl">（呼吸、眨眼、头部微动），无需 idle 底座</div>
+  </div>
+
+</div></div></body></html>

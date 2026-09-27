@@ -1,0 +1,305 @@
+from datetime import datetime
+from pathlib import Path
+
+from fastapi import APIRouter, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+
+from backend.core.config import settings
+from backend.db.database import get_db
+
+router = APIRouter(prefix="/digital-human", tags=["digital-human"])
+
+# 形象库分类法（对标 HeyGen/Synthesia/讯飞 的 faceted 多维标签，裁剪适配景区导览）：
+#   style  风格主轴(顶部 tab)：现代 / 古风 / 民族
+#   gender 性别(副筛选)：female / male
+#   persona 气质人设(对标商用"行业/用途"，对导游=服务人设)
+#   outfit  服饰主题   age 年龄段(青年/中年/长者)   fit 适配景区(帮管理员快速选对)
+#   recommended 进"推荐"tab(已烘录、开箱即用)   coming_soon 仅预览(InstantID 换装,烘录后上架)
+# preview 路径由游客端静态服务（webapp/public/avatars/）；对应真实 MuseTalk avatar 见桥接 AVATAR_MAP。
+_AVATAR_PRESETS = [
+    # —— 万相高颜值形象库（10 人，每人配 8 景区 × 16:9/9:16 两版带景底图，见 assets/avatar_variants）——
+    {"id": "F1_modern",  "name": "现代讲解", "gender": "female", "style": "现代",
+     "persona": "知性干练", "outfit": "海军蓝职业装", "age": "青年", "fit": "会展·都市·博物馆",
+     "preview": "/avatars/F1_modern.jpg", "recommended": True},
+    {"id": "F2_hanfu",   "name": "汉服佳人", "gender": "female", "style": "古风",
+     "persona": "温婉古典", "outfit": "汉服襦裙", "age": "青年", "fit": "古镇·禅意",
+     "preview": "/avatars/F2_hanfu.jpg", "recommended": True},
+    {"id": "F3_youth",   "name": "青春向导", "gender": "female", "style": "现代",
+     "persona": "甜美活泼", "outfit": "景区马甲", "age": "青年", "fit": "通用·各类景区",
+     "preview": "/avatars/F3_youth.jpg", "recommended": True},
+    {"id": "F4_qipao",   "name": "旗袍雅韵", "gender": "female", "style": "古风",
+     "persona": "东方典雅", "outfit": "改良旗袍", "age": "青年", "fit": "古镇·民国街区",
+     "preview": "/avatars/F4_qipao.jpg", "recommended": True},
+    {"id": "F5_ethnic",  "name": "民族风情", "gender": "female", "style": "民族",
+     "persona": "明艳亲切", "outfit": "民族服饰银饰", "age": "青年", "fit": "民族风情区",
+     "preview": "/avatars/F5_ethnic.jpg", "recommended": True},
+    {"id": "F6_mature",  "name": "知性讲解", "gender": "female", "style": "现代",
+     "persona": "端庄大气", "outfit": "高级职业套装", "age": "中年", "fit": "博物馆/人文景区",
+     "preview": "/avatars/F6_mature.jpg", "recommended": True},
+    {"id": "M1_modern",  "name": "儒雅讲解", "gender": "male",   "style": "现代",
+     "persona": "阳光亲和", "outfit": "浅衬衫西装", "age": "青年", "fit": "会展·都市·博物馆",
+     "preview": "/avatars/M1_modern.jpg", "recommended": True},
+    {"id": "M2_scholar", "name": "古风书生", "gender": "male",   "style": "古风",
+     "persona": "清俊温润", "outfit": "文士青衫", "age": "青年", "fit": "古镇·禅意",
+     "preview": "/avatars/M2_scholar.jpg", "recommended": True},
+    {"id": "M3_youth",   "name": "阳光向导", "gender": "male",   "style": "现代",
+     "persona": "青春朝气", "outfit": "讲解员制服", "age": "青年", "fit": "通用·各类景区",
+     "preview": "/avatars/M3_youth.jpg", "recommended": True},
+    {"id": "M4_business","name": "商务沉稳", "gender": "male",   "style": "现代",
+     "persona": "成熟大气", "outfit": "商务正装", "age": "中年", "fit": "会展/商务景区",
+     "preview": "/avatars/M4_business.jpg", "recommended": True},
+    # —— 历史/原 sweet_bob 系列 ——
+    {"id": "female_sweet",   "name": "甜美向导", "gender": "female", "style": "现代",
+     "persona": "活力向导", "outfit": "浅色活力装", "age": "青年", "fit": "现代/都市景区",
+     "preview": "/avatars/female_sweet.jpg", "recommended": True},
+    {"id": "female_guofeng", "name": "古风佳人", "gender": "female", "style": "古风",
+     "persona": "知性讲解", "outfit": "汉服襦裙", "age": "青年", "fit": "古镇·禅意",
+     "preview": "/avatars/female_guofeng.jpg", "recommended": True},
+    {"id": "male_casual",    "name": "阳光青年", "gender": "male",   "style": "现代",
+     "persona": "亲切热情", "outfit": "休闲装", "age": "青年", "fit": "现代/都市景区",
+     "preview": "/avatars/male_casual.jpg", "recommended": True},
+    # —— AI 换装系列（InstantID 同脸换装/妆造，烘录后上架）——
+    {"id": "outfit_qipao",  "name": "旗袍雅韵", "gender": "female", "style": "古风",
+     "persona": "知性讲解", "outfit": "旗袍", "age": "青年", "fit": "古镇·民国街区",
+     "preview": "/avatars/outfit_qipao.jpg", "coming_soon": True},
+    {"id": "outfit_hanfu",  "name": "汉服灵动", "gender": "female", "style": "古风",
+     "persona": "知性讲解", "outfit": "汉服", "age": "青年", "fit": "古镇·禅意",
+     "preview": "/avatars/outfit_hanfu.jpg", "coming_soon": True},
+    {"id": "outfit_blazer", "name": "职业知性", "gender": "female", "style": "现代",
+     "persona": "沉稳儒雅", "outfit": "职业正装", "age": "青年", "fit": "会展/都市/博物馆",
+     "preview": "/avatars/outfit_blazer.jpg", "coming_soon": True},
+    {"id": "outfit_ethnic", "name": "民族风情", "gender": "female", "style": "民族",
+     "persona": "亲切热情", "outfit": "民族服饰", "age": "青年", "fit": "民族风情区",
+     "preview": "/avatars/outfit_ethnic.jpg", "coming_soon": True},
+    {"id": "outfit_vest",   "name": "标准导览", "gender": "female", "style": "现代",
+     "persona": "活力向导", "outfit": "导览马甲", "age": "青年", "fit": "通用·各类景区",
+     "preview": "/avatars/outfit_vest.jpg", "coming_soon": True},
+    {"id": "outfit_coat",   "name": "冬日暖装", "gender": "female", "style": "现代",
+     "persona": "知性讲解", "outfit": "冬季大衣", "age": "青年", "fit": "北方/冬季景区",
+     "preview": "/avatars/outfit_coat.jpg", "coming_soon": True},
+    {"id": "female_mature", "name": "知性长辈", "gender": "female", "style": "现代",
+     "persona": "沉稳儒雅", "outfit": "知性套装", "age": "中年", "fit": "博物馆/人文景区",
+     "preview": "/avatars/female_mature.jpg", "coming_soon": True},
+    # —— 旧占位 id（兼容已有配置行，UI 不展示）——
+    {"id": "female_elegant", "name": "素雅女性", "gender": "female", "style": "古风", "legacy": True},
+    {"id": "female_young",   "name": "活泼女性", "gender": "female", "style": "现代", "legacy": True},
+    {"id": "male_mature",    "name": "沉稳男性", "gender": "male",   "style": "现代", "legacy": True},
+    {"id": "male_young",     "name": "阳光男性", "gender": "male",   "style": "现代", "legacy": True},
+]
+
+# 风格主轴枚举（前端 tab 顺序）：推荐由 recommended 标记派生
+AVATAR_STYLES = ["现代", "古风", "民族"]
+
+# 音色目录：映射到 Qwen3-TTS-Flash 系统音色（桥接 VOICE_MAP 翻译），消息级即时切换。
+_VOICE_PRESETS = [
+    {"id": "voice_gentle_f", "name": "知性温柔", "gender": "female", "tone": "知性、从容（默认）"},
+    {"id": "voice_lively_f", "name": "活泼甜美", "gender": "female", "tone": "明快、亲和"},
+    {"id": "voice_wu_f",     "name": "吴侬软语", "gender": "female", "tone": "吴语方言、软糯（江南景区特色）"},
+    {"id": "voice_calm_m",   "name": "沉稳大气", "gender": "male",   "tone": "低沉、可靠"},
+    {"id": "voice_bright_m", "name": "京腔青年", "gender": "male",   "tone": "北京话、爽朗"},
+]
+
+# 场景背景目录：'' = 原始极简灰底（兼容旧行为）；bg_<scenic_id> 与景区 id 严格对应。
+# 背景=离线烘进 Ditto 源肖像（变体 <base>_bg_<bg_id>.png），切换「下次连接生效」；
+# 变体由 scripts/gen_avatar_background.py 产出，桥接按存在性解析、缺失自动回落原图。
+_BACKGROUND_PRESETS = [
+    {"id": "",                "name": "极简灰底（原始）", "scenic": None,          "preview": None},
+    {"id": "bg_lingshan",     "name": "灵山·禅意佛境",   "scenic": "lingshan",    "preview": "/avatar_backgrounds/bg_lingshan.jpg"},
+    {"id": "bg_nihuawan",     "name": "拈花湾·禅镇暮色", "scenic": "nihuawan",    "preview": "/avatar_backgrounds/bg_nihuawan.jpg"},
+    {"id": "bg_xihu",         "name": "西湖·烟雨如画",   "scenic": "xihu",        "preview": "/avatar_backgrounds/bg_xihu.jpg"},
+    {"id": "bg_huangshan",    "name": "黄山·云海日出",   "scenic": "huangshan",   "preview": "/avatar_backgrounds/bg_huangshan.jpg"},
+    {"id": "bg_gugong",       "name": "故宫·朱墙秋色",   "scenic": "gugong",      "preview": "/avatar_backgrounds/bg_gugong.jpg"},
+    {"id": "bg_zhangjiajie",  "name": "张家界·峰林云雾", "scenic": "zhangjiajie", "preview": "/avatar_backgrounds/bg_zhangjiajie.jpg"},
+    {"id": "bg_bingmayong",   "name": "兵马俑·展厅光影", "scenic": "bingmayong",  "preview": "/avatar_backgrounds/bg_bingmayong.jpg"},
+    {"id": "bg_mogaoku",      "name": "敦煌·鸣沙月泉",   "scenic": "mogaoku",     "preview": "/avatar_backgrounds/bg_mogaoku.jpg"},
+]
+
+# 管理端上传的自定义背景原图落盘目录（ECS/本地通用；合成由本地脚本拉取）
+_BG_UPLOAD_DIR: Path = settings.vector_store_dir.parent / "backgrounds"
+
+_DEFAULT_CONFIG = {
+    "avatar_id":       "female_sweet",
+    "avatar_name":     "甜美波波头",
+    "voice_id":        "voice_gentle_f",
+    "voice_name":      "知性温柔",
+    "background_id":   "",
+    "background_name": "",
+}
+
+
+class ConfigIn(BaseModel):
+    scenic_id:   str
+    avatar_id:   str
+    avatar_name: str
+    voice_id:    str
+    voice_name:  str
+    background_id:   str | None = None   # 可选：旧管理端不传也兼容
+    background_name: str | None = None
+
+
+def _row_to_dict(row) -> dict:
+    return {
+        "scenic_id":       row["scenic_id"],
+        "avatar_id":       row["avatar_id"],
+        "avatar_name":     row["avatar_name"],
+        "voice_id":        row["voice_id"],
+        "voice_name":      row["voice_name"],
+        "background_id":   row["background_id"],
+        "background_name": row["background_name"],
+        "updated_at":      row["updated_at"],
+    }
+
+
+def _valid_background_ids(conn) -> set[str]:
+    """合法背景集合 = 内置 presets ∪ 已合成完毕(ready)的上传背景。"""
+    ids = {b["id"] for b in _BACKGROUND_PRESETS}
+    rows = conn.execute("SELECT bg_id FROM dh_background WHERE status='ready'").fetchall()
+    return ids | {r["bg_id"] for r in rows}
+
+
+def _uploaded_backgrounds(conn) -> list[dict]:
+    rows = conn.execute(
+        "SELECT bg_id, name, scenic_id, status FROM dh_background ORDER BY created_at DESC"
+    ).fetchall()
+    return [{"id": r["bg_id"], "name": r["name"], "scenic": r["scenic_id"],
+             "preview": f"/avatar_backgrounds/{r['bg_id']}.jpg" if r["status"] == "ready" else None,
+             "source": "upload", "status": r["status"]} for r in rows]
+
+
+@router.get("/presets")
+def get_presets():
+    """返回可供选择的形象、音色与场景背景列表。"""
+    with get_db() as conn:
+        backgrounds = _BACKGROUND_PRESETS + _uploaded_backgrounds(conn)
+    return {"avatars": _AVATAR_PRESETS, "voices": _VOICE_PRESETS, "backgrounds": backgrounds}
+
+
+@router.get("/config")
+def get_config(scenic_id: str = "default"):
+    """
+    获取指定景区的数字人配置。
+    若该景区未单独配置，回落到 'default'；若 default 也没有，返回内置默认值。
+    """
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM digital_human_config WHERE scenic_id = ?", (scenic_id,)
+        ).fetchone()
+        if row:
+            return _row_to_dict(row)
+
+        # 回落到 default
+        if scenic_id != "default":
+            row = conn.execute(
+                "SELECT * FROM digital_human_config WHERE scenic_id = 'default'"
+            ).fetchone()
+            if row:
+                return {**_row_to_dict(row), "scenic_id": scenic_id, "fallback": True}
+
+    return {**_DEFAULT_CONFIG, "scenic_id": scenic_id, "updated_at": None, "fallback": True}
+
+
+@router.get("/config/all")
+def get_all_configs():
+    """返回所有景区的配置快照（管理后台列表页用）。"""
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM digital_human_config ORDER BY scenic_id").fetchall()
+    return [_row_to_dict(r) for r in rows]
+
+
+@router.put("/config")
+def put_config(body: ConfigIn):
+    """
+    新建或更新指定景区的数字人配置（UPSERT）。
+    scenic_id='default' 表示全局默认，其余景区未设置时回落到它。
+    """
+    avatar_ids = {a["id"] for a in _AVATAR_PRESETS if not a.get("coming_soon")}
+    voice_ids  = {v["id"] for v in _VOICE_PRESETS}
+    if body.avatar_id not in avatar_ids:
+        raise HTTPException(status_code=400, detail=f"无效 avatar_id: {body.avatar_id}")
+    if body.voice_id not in voice_ids:
+        raise HTTPException(status_code=400, detail=f"无效 voice_id: {body.voice_id}")
+
+    with get_db() as conn:
+        bg = body.background_id or ""
+        if bg and bg not in _valid_background_ids(conn):
+            raise HTTPException(status_code=400, detail=f"无效 background_id: {bg}")
+        conn.execute(
+            """INSERT INTO digital_human_config
+                   (scenic_id, avatar_id, avatar_name, voice_id, voice_name,
+                    background_id, background_name, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S', 'now', 'localtime'))
+               ON CONFLICT(scenic_id) DO UPDATE SET
+                   avatar_id       = excluded.avatar_id,
+                   avatar_name     = excluded.avatar_name,
+                   voice_id        = excluded.voice_id,
+                   voice_name      = excluded.voice_name,
+                   background_id   = excluded.background_id,
+                   background_name = excluded.background_name,
+                   updated_at      = excluded.updated_at""",
+            (body.scenic_id, body.avatar_id, body.avatar_name,
+             body.voice_id, body.voice_name, bg, body.background_name or ""),
+        )
+    return {"ok": True, "scenic_id": body.scenic_id}
+
+
+# ── 自定义背景上传（管理端）──────────────────────────────────────
+# 拉取式衔接：后端（可能在 ECS）只登记+存原图；合成必须在有 LiveTalking 数据目录的
+# 本地 GPU 机执行——`scripts/gen_avatar_background.py sync --backend <url>` 拉 pending
+# → 下载原图 → 抠像合成出 avatar 变体 → 回调置 ready。与「下次连接生效」语义一致。
+
+@router.post("/background/upload")
+async def upload_background(file: UploadFile, name: str = Form(...),
+                            scenic_id: str | None = Form(None)):
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in (".png", ".jpg", ".jpeg"):
+        raise HTTPException(status_code=400, detail="仅支持 png/jpg 背景图")
+    data = await file.read()
+    if len(data) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="背景图不能超过 20MB")
+    bg_id = "custom_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+    _BG_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    path = _BG_UPLOAD_DIR / f"{bg_id}{suffix}"
+    path.write_bytes(data)
+    with get_db() as conn:
+        conn.execute(
+            """INSERT INTO dh_background (bg_id, name, scenic_id, source, status, file_path)
+               VALUES (?, ?, ?, 'upload', 'pending', ?)""",
+            (bg_id, name, scenic_id, str(path)),
+        )
+    return {"ok": True, "bg_id": bg_id, "status": "pending",
+            "hint": "本地执行 scripts/gen_avatar_background.py sync 完成合成后即可在配置中使用"}
+
+
+@router.get("/background/pending")
+def pending_backgrounds():
+    """本地合成脚本轮询：待合成的上传背景。"""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT bg_id, name, scenic_id FROM dh_background WHERE status='pending'"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+@router.get("/background/file/{bg_id}")
+def background_file(bg_id: str):
+    """本地合成脚本下载上传的背景原图。"""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT file_path FROM dh_background WHERE bg_id=?", (bg_id,)
+        ).fetchone()
+    if not row or not Path(row["file_path"]).exists():
+        raise HTTPException(status_code=404, detail=f"背景不存在: {bg_id}")
+    return FileResponse(row["file_path"])
+
+
+@router.post("/background/{bg_id}/ready")
+def background_ready(bg_id: str):
+    """本地合成完成回调：置 ready，背景即可被 PUT /config 引用。"""
+    with get_db() as conn:
+        cur = conn.execute(
+            "UPDATE dh_background SET status='ready' WHERE bg_id=?", (bg_id,)
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail=f"背景不存在: {bg_id}")
+    return {"ok": True, "bg_id": bg_id, "status": "ready"}

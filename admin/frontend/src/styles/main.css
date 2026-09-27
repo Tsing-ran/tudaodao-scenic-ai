@@ -1,0 +1,212 @@
+/* ── Webfont：Inter（SIL OFL 开源，自托管 latin 子集；数字/英文商务感来源，
+      与学长国一项目（Arco 默认栈）同款；中文回落系统苹方/雅黑） ───────── */
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('./fonts/inter-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 500; font-display: swap;
+  src: url('./fonts/inter-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 600; font-display: swap;
+  src: url('./fonts/inter-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('./fonts/inter-latin-700-normal.woff2') format('woff2');
+}
+
+/* ── 中文主字体：阿里巴巴普惠体 3.0（免费商用，阿里云控制台同款企业感；
+      GB2312 常用 6763 字子集化 ~950KB/字重，生僻字回落鸿蒙/系统字体） ── */
+@font-face {
+  font-family: 'Alibaba PuHuiTi 3.0'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('./fonts/puhuiti3-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Alibaba PuHuiTi 3.0'; font-style: normal; font-weight: 500; font-display: swap;
+  src: url('./fonts/puhuiti3-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Alibaba PuHuiTi 3.0'; font-style: normal; font-weight: 600; font-display: swap;
+  src: url('./fonts/puhuiti3-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Alibaba PuHuiTi 3.0'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('./fonts/puhuiti3-700.woff2') format('woff2');
+}
+
+/* ── Design Token System ──────────────────────────────── */
+:root {
+  /* Neutrals（白色为主体：边框/底色去蓝调、大幅调浅，参考智能通截图） */
+  --c-ink:       #333333;
+  --c-ink-2:     #4B4B4B;
+  --c-ink-3:     #707070;
+  --c-ink-4:     #9AA1B0;
+  --c-border:    #E8ECF2;
+  --c-border-2:  #D5DCE6;
+
+  /* Surfaces */
+  --c-paper:     #F5F6FA;
+  --c-paper-2:   #F0F3F8;
+  --c-surface:   #FFFFFF;
+
+  /* Blue — primary accent（浅色模式主色：天青蓝；登录页左板 HHU 蓝为写死渐变不受影响） */
+  --c-gold-dark: #1B5FD9;
+  --c-gold:      #2F7CF6;
+  --c-gold-2:    #5B9CF8;
+  --c-gold-3:    #8FBFFA;
+  --c-gold-bg:   #E8F2FF;
+  --c-gold-bdr:  #C7DDFB;
+
+  /* Blue — admin/info (secondary) */
+  --c-blue:      #0077B6;
+  --c-blue-2:    #0096C7;
+  --c-blue-bg:   #EAF4FB;
+  --c-blue-bdr:  #ACD4ED;
+
+  /* Semantic */
+  --c-green:     #2D7A4F;
+  --c-green-bg:  #EDFBF4;
+  --c-red:       #BE3535;
+  --c-red-bg:    #FFF5F5;
+  --c-amber:     #B45309;
+  --c-amber-bg:  #FFFBEB;
+
+  /* Typography（数字/英文=Inter，中文=阿里普惠体 3.0；生僻字回落鸿蒙→系统） */
+  --font-serif:  'Inter', 'Alibaba PuHuiTi 3.0', 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-sans:   'Inter', 'Alibaba PuHuiTi 3.0', 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+
+  /* Shape */
+  --radius-xs:   4px;
+  --radius-sm:   6px;
+  --radius:      10px;
+  --radius-lg:   16px;
+  --radius-xl:   24px;
+
+  /* Elevation（中性冷灰投影，卡片更轻） */
+  --shadow-xs:   0 1px 2px rgba(23,43,77,0.05);
+  --shadow-sm:   0 1px 4px rgba(23,43,77,0.06), 0 0 0 1px rgba(23,43,77,0.03);
+  --shadow:      0 4px 16px rgba(23,43,77,0.08);
+  --shadow-lg:   0 8px 32px rgba(23,43,77,0.10);
+}
+
+/* ── Reset ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Element Plus 的 body{font-family:var(--el-font-family)} 会抢 body 字体，token 对齐让它同源 */
+:root { --el-font-family: var(--font-sans); }
+
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: var(--c-paper);
+  color: var(--c-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums; /* Inter 等宽数字：KPI/时钟跳动不抖 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app { width: 100%; height: 100%; }
+
+/* ── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--c-border-2); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--c-ink-4); }
+
+/* ── Element Plus — Light Theme Overrides ───────────────── */
+.el-input__wrapper {
+  background-color: var(--c-surface) !important;
+  box-shadow: 0 0 0 1px var(--c-border) !important;
+  border-radius: var(--radius-sm) !important;
+  transition: box-shadow 0.15s !important;
+}
+.el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--c-border-2) !important;
+}
+.el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 2px rgba(47,124,246,0.25) !important;
+}
+.el-input__inner {
+  color: var(--c-ink) !important;
+  font-family: var(--font-sans) !important;
+  font-size: 13px !important;
+}
+.el-input__inner::placeholder { color: var(--c-ink-4) !important; }
+
+.el-textarea__inner {
+  background: var(--c-surface) !important;
+  color: var(--c-ink) !important;
+  border: 1px solid var(--c-border) !important;
+  border-radius: var(--radius-sm) !important;
+  font-family: var(--font-sans) !important;
+  font-size: 13px !important;
+  resize: none;
+  transition: border-color 0.15s !important;
+}
+.el-textarea__inner:focus {
+  border-color: var(--c-gold) !important;
+  box-shadow: 0 0 0 2px rgba(47,124,246,0.18) !important;
+}
+.el-textarea__inner::placeholder { color: var(--c-ink-4) !important; }
+
+.el-button {
+  font-family: var(--font-sans) !important;
+  transition: all 0.15s !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+.el-select .el-input__wrapper { background: var(--c-surface) !important; }
+.el-select-dropdown { border: 1px solid var(--c-border) !important; box-shadow: var(--shadow) !important; }
+.el-select-dropdown__item { font-family: var(--font-sans) !important; }
+.el-select-dropdown__item.is-hovering { background: var(--c-paper) !important; }
+.el-select-dropdown__item.is-selected { color: var(--c-gold) !important; }
+
+/* 音色 / 场景背景下拉选项（popper teleport 到 body，须走全局样式） */
+.av-opt-popper .el-select-dropdown__item {
+  height: auto !important; line-height: 1.4 !important; padding: 8px 14px !important;
+}
+.av-opt-popper .opt-line { display: flex; align-items: center; gap: 9px; width: 100%; }
+.av-opt-popper .opt-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.av-opt-popper .opt-sub { margin-left: auto; padding-left: 10px; font-size: 11px; color: var(--c-ink-4); flex-shrink: 0; }
+.av-opt-popper .opt-bg .opt-thumb {
+  width: 30px; height: 40px; object-fit: cover; border-radius: 4px; display: block; flex-shrink: 0;
+}
+.av-opt-popper .opt-bg .opt-thumb-none {
+  display: flex; align-items: center; justify-content: center;
+  background: var(--c-paper-2); color: var(--c-ink-4);
+}
+
+.el-table {
+  --el-table-bg-color: transparent !important;
+  --el-table-header-bg-color: var(--c-paper) !important;
+  --el-table-tr-bg-color: transparent !important;
+  --el-table-row-hover-bg-color: var(--c-paper-2) !important;
+  --el-table-border-color: var(--c-border) !important;
+  --el-table-text-color: var(--c-ink-2) !important;
+  --el-table-header-text-color: var(--c-ink-3) !important;
+  font-size: 13px !important;
+  font-family: var(--font-sans) !important;
+}
+
+.el-upload-dragger {
+  background: var(--c-paper) !important;
+  border: 1.5px dashed var(--c-border) !important;
+  border-radius: var(--radius) !important;
+  transition: all 0.15s !important;
+}
+.el-upload-dragger:hover { border-color: var(--c-gold) !important; background: var(--c-gold-bg) !important; }
+
+.el-tag { font-family: var(--font-sans) !important; font-size: 11px !important; border-radius: var(--radius-xs) !important; }
+
+.el-progress-bar__outer { background: var(--c-border) !important; border-radius: 4px !important; }
+.el-progress-bar__inner  { border-radius: 4px !important; }
+
+.el-slider__runway { background: var(--c-border) !important; }
+.el-slider__bar    { background: var(--c-gold) !important; }
+.el-slider__button { border-color: var(--c-gold) !important; }
+
+.el-input-number .el-input__wrapper { box-shadow: 0 0 0 1px var(--c-border) !important; }

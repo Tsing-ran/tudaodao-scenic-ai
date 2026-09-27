@@ -1,0 +1,3440 @@
+<template>
+  <div class="admin-layout">
+
+    <!-- ── 顶部导航栏 ── -->
+    <header class="top-nav">
+      <div class="tn-left">
+        <div class="tn-logo" aria-hidden="true">
+          <span class="tn-dot" style="background:#FF6B6B"/>
+          <span class="tn-dot" style="background:#4ECDC4"/>
+          <span class="tn-dot" style="background:#FFE66D"/>
+          <span class="tn-dot" style="background:#A8E6CF"/>
+        </div>
+        <span class="tn-brand">途叨叨</span>
+        <span class="tn-sep">·</span>
+        <span class="tn-scenic">景区管理后台</span>
+      </div>
+      <div class="tn-right">
+
+
+        <span class="tn-clock">{{ tnTime }}</span>
+
+      </div>
+    </header>
+
+
+    <!-- ── 左侧导航栏 ── -->
+    <aside class="sidebar">
+<nav class="sidebar-nav">
+        <button
+          v-for="item in navItems" :key="item.key"
+          class="nav-item"
+          :class="{ active: activeTab === item.key }"
+          :aria-current="activeTab === item.key ? 'page' : undefined"
+          @click="activeTab = item.key"
+        >
+          <component :is="item.icon" :size="15" :stroke-width="1.5" aria-hidden="true" />
+          <span>{{ item.label }}</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="scenic-name-input">
+          <MapPin :size="12" :stroke-width="1.5" aria-hidden="true" />
+          <input v-model="sceneStore.scenicName" class="name-input" placeholder="景区名称" aria-label="景区名称" />
+        </div>
+        <div class="account-row" v-if="authStore.user">
+          <div class="account-info">
+            <UserCircle :size="14" :stroke-width="1.5" />
+            <span>{{ authStore.user.username }}</span>
+          </div>
+          <button class="logout-btn" @click="handleLogout" title="退出登录" aria-label="退出登录">
+            <LogOut :size="13" :stroke-width="1.5" aria-hidden="true" />
+          </button>
+        </div>
+        <div class="sidebar-theme-row">
+          <button class="sidebar-theme-btn" @click="toggleTheme">
+            <Sun v-if="sidebarDark" :size="13" :stroke-width="1.5" />
+            <Moon v-else :size="13" :stroke-width="1.5" />
+            <span>{{ sidebarDark ? '浅色模式' : '深色模式' }}</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── 主内容区 ── -->
+    <main class="admin-main">
+
+      <!-- ═══ 形象管理 ═══ -->
+      <div v-show="activeTab === 'avatar'" class="tab-content">
+        <div class="page-header">
+          <h2>数字人形象管理</h2>
+          <span class="page-sub">为「{{ sceneStore.scenicName || '当前景区' }}」挑选形象 · 换装 · 音色 · 背景，实时预览后设为默认</span>
+        </div>
+
+        <div class="avatar-layout">
+          <!-- 左列：形象库 + 换装 + 音色 + 背景 + AI 生成 -->
+          <div class="avatar-col-config">
+            <!-- 形象库 -->
+            <div class="card">
+              <div class="card-title"><UserCircle :size="14" :stroke-width="1.5" />形象库 · 身份</div>
+              <div class="av-filters">
+                <el-radio-group v-model="avStyle" size="small">
+                  <el-radio-button v-for="s in AV_STYLES" :key="s" :value="s">{{ s }}</el-radio-button>
+                </el-radio-group>
+                <el-radio-group v-model="avGender" size="small">
+                  <el-radio-button value="all">全部</el-radio-button>
+                  <el-radio-button value="female">女</el-radio-button>
+                  <el-radio-button value="male">男</el-radio-button>
+                </el-radio-group>
+              </div>
+              <div class="av-grid">
+                <button v-for="a in shownAvatars" :key="a.id"
+                  :class="['av-card', { sel: a.id === selAvatar, soon: a.coming_soon }]"
+                  :disabled="a.coming_soon" @click="pickAvatar(a)">
+                  <img :src="a.preview" :alt="a.name" loading="lazy" />
+                  <span class="av-name">{{ a.name }}</span>
+                  <span v-if="a.coming_soon" class="av-badge soon">烘录中</span>
+                  <CheckCircle v-else-if="a.id === selAvatar" class="av-check" :size="16" :stroke-width="2" />
+                </button>
+                <p v-if="!shownAvatars.length" class="av-empty">该分类暂无形象</p>
+              </div>
+            </div>
+
+            <!-- 换装衣橱（聚焦甜美脸时出现） -->
+            <div v-if="outfits.length" class="card">
+              <div class="card-title"><Shirt :size="14" :stroke-width="1.5" />换装衣橱 · 同一张脸多套服装</div>
+              <div class="av-wardrobe">
+                <button v-for="o in outfits" :key="o.id"
+                  :class="['wd-card', { sel: o.id === selAvatar }]" @click="pickAvatar(o)">
+                  <img :src="o.preview" :alt="o.outfit || o.name" loading="lazy" />
+                  <span>{{ o.outfit || o.name }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 音色 -->
+            <div class="card">
+              <div class="card-title"><Volume2 :size="14" :stroke-width="1.5" />音色</div>
+              <div class="av-voices">
+                <button v-for="v in voices" :key="v.id"
+                  :class="['vc-card', { sel: v.id === selVoice }]" @click="selVoice = v.id">
+                  <span class="vc-name">{{ v.name }}</span>
+                  <span class="vc-tone">{{ v.tone }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 场景背景 -->
+            <div class="card">
+              <div class="card-title"><Eye :size="14" :stroke-width="1.5" />场景背景</div>
+              <div class="av-bgs">
+                <button v-for="b in backgrounds" :key="b.id"
+                  :class="['bg-card', { sel: b.id === selBg }]" @click="selBg = b.id">
+                  <img v-if="b.preview" :src="b.preview" :alt="b.name" loading="lazy" />
+                  <div v-else class="bg-none">极简灰底</div>
+                  <span>{{ b.name }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- AI 生成专属向导 -->
+            <div class="card">
+              <div class="card-title"><Wand2 :size="14" :stroke-width="1.5" />生成专属向导（通义万相）</div>
+              <el-input v-model="customPrompt" type="textarea" :rows="3"
+                placeholder="描述想要的形象（如：身着唐装的儒雅男导游）。生成后自动烘成可驱动数字人并加入形象库" />
+              <button class="primary-btn full-btn mt12" @click="handleGenerate" :disabled="sceneStore.isGeneratingAvatar">
+                <Sparkles v-if="!sceneStore.isGeneratingAvatar" :size="14" :stroke-width="1.5" />
+                <Loader2 v-else :size="14" :stroke-width="1.5" class="spin" />
+                {{ sceneStore.isGeneratingAvatar ? '生成中…' : '生成并加入形象库' }}
+              </button>
+              <div v-if="sceneStore.isGeneratingAvatar" class="progress-wrap">
+                <div class="progress-bar"><div class="progress-fill" :style="{ width: genProgress + '%' }" /></div>
+                <span>万相AI正在生成专属形象…</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右列：实时预览（9:16 大屏流，与游客 16:9 隔离） -->
+          <div class="avatar-col-preview">
+            <div class="card avatar-preview-card">
+              <div class="card-title"><Eye :size="14" :stroke-width="1.5" />实时预览 · 9:16 大屏流（不打断游客）</div>
+              <div class="avatar-preview-box">
+                <video ref="previewVideoEl" class="preview-video" muted autoplay playsinline />
+                <div v-if="applying" class="preview-applying"><Loader2 :size="26" :stroke-width="1.5" class="spin" /> 换形象中…</div>
+              </div>
+              <div class="preview-meta">
+                <span>形象：{{ selAvatarName || '—' }}</span>
+                <span>音色：{{ selVoiceName || '—' }}</span>
+              </div>
+              <button class="primary-btn full-btn mt12" :disabled="saving || !selAvatar" @click="saveDefault">
+                <Save :size="14" :stroke-width="1.5" /> {{ saving ? '保存中…' : '设为本景区默认' }}
+              </button>
+              <button class="ghost-btn full-btn mt8" @click="reloadPreview">
+                <RefreshCw :size="13" :stroke-width="1.5" /> 重连预览
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ 知识库管理 ═══ -->
+      <div v-show="activeTab === 'knowledge'" class="tab-content">
+        <div class="page-header">
+          <h2>知识库管理</h2>
+          <span class="page-sub">管理景区讲解词、文史资料、常见问答等知识内容</span>
+        </div>
+
+        <!-- 子 Tab 导航 -->
+        <div class="kb-nav mb24">
+          <button :class="['kb-nav-btn', { active: kbTab === 'upload' }]" @click="kbTab = 'upload'">
+            <UploadCloud :size="13" :stroke-width="1.5" />文件上传
+          </button>
+          <button :class="['kb-nav-btn', { active: kbTab === 'faq' }]" @click="kbTab = 'faq'">
+            <HelpCircle :size="13" :stroke-width="1.5" />FAQ 问答
+          </button>
+          <button :class="['kb-nav-btn', { active: kbTab === 'text' }]" @click="kbTab = 'text'">
+            <PenLine :size="13" :stroke-width="1.5" />文本段落
+          </button>
+          <button :class="['kb-nav-btn', { active: kbTab === 'config' }]" @click="kbTab = 'config'">
+            <Settings2 :size="13" :stroke-width="1.5" />检索设置
+          </button>
+        </div>
+
+        <!-- ── 文件上传 Tab ── -->
+        <template v-if="kbTab === 'upload'">
+          <div class="card mb16">
+            <div class="card-title"><Upload :size="14" :stroke-width="1.5" />上传文档</div>
+            <el-upload class="uploader" drag multiple :before-upload="beforeUpload"
+              :http-request="handleKnowledgeUpload" :show-file-list="false"
+              accept=".txt,.pdf,.docx,.md">
+              <div class="upload-zone">
+                <UploadCloud :size="32" :stroke-width="1" class="upload-ico" />
+                <p class="upload-main">拖拽文件至此，或<em>点击上传</em></p>
+                <p class="upload-hint">支持 .txt / .pdf / .docx / .md，单文件 ≤ 20MB</p>
+              </div>
+            </el-upload>
+          </div>
+
+          <div class="card">
+            <div v-if="docDeletePending" class="undo-toast">
+              已删除「{{ docDeletePending.name }}」
+              <button class="link-btn" style="color:var(--c-gold-3);margin-left:auto" @click="undoDeleteDoc">撤销</button>
+            </div>
+            <div class="card-title">
+              <FileText :size="14" :stroke-width="1.5" />文档列表
+              <div class="search-wrap ml-auto">
+                <Search :size="13" :stroke-width="1.5" class="search-ico" aria-hidden="true" />
+                <input v-model="kbSearch" class="search-input" placeholder="搜索文档…" aria-label="搜索文档" />
+              </div>
+            </div>
+            <el-table :data="filteredDocs" size="small">
+              <el-table-column label="文档名称" min-width="200">
+                <template #default="{ row }">
+                  <div class="doc-cell">
+                    <span class="doc-type" :class="row.type">{{ row.type.toUpperCase() }}</span>
+                    {{ row.name }}
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column prop="chunks" label="片段数" width="72" />
+              <el-table-column prop="uploadTime" label="上传时间" width="138" />
+              <el-table-column prop="size" label="大小" width="64" />
+              <el-table-column label="状态" width="82">
+                <template #default="{ row }">
+                  <span class="status-pill" :class="[row.status === '已索引' ? 'green' : row.status === '不支持' ? 'red' : 'amber', { pulsing: row.status === '索引中' }]">{{ row.status }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="130">
+                <template #default="{ row }">
+                  <div class="ops-cell">
+                    <button class="link-btn rebuild" title="重新提取文档内容并分块" @click="rebuildDoc(row)">重建</button>
+                    <span class="ops-sep" />
+                    <button class="link-btn reindex" title="重新建立向量索引" @click="reindexDoc(row)">索引</button>
+                    <span class="ops-sep" />
+                    <button class="link-btn danger" @click="deleteDoc(row)">删除</button>
+                  </div>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div class="kb-summary">
+              共 {{ knowledgeDocs.length }} 份 · 已索引 {{ knowledgeDocs.filter(d=>d.status==='已索引').length }} 份 · {{ totalSize }}
+            </div>
+          </div>
+
+        </template>
+
+        <!-- ── 检索设置 Tab ── -->
+        <template v-else-if="kbTab === 'config'">
+          <div class="card">
+            <div class="card-title"><Settings2 :size="14" :stroke-width="1.5" />检索配置</div>
+            <div class="form-grid">
+              <div class="form-row">
+                <label>检索策略</label>
+                <el-select v-model="kbConfig.strategy" size="small" style="width:180px">
+                  <el-option label="语义检索（推荐）" value="semantic" />
+                  <el-option label="关键词检索" value="keyword" />
+                  <el-option label="混合检索" value="hybrid" />
+                </el-select>
+              </div>
+              <p class="config-hint">语义检索适合自然语言问答（推荐），关键词检索适合精确搜索，混合检索兼顾两者</p>
+              <div class="form-row">
+                <label>最大召回数</label>
+                <el-input-number v-model="kbConfig.topK" :min="1" :max="10" size="small" />
+              </div>
+              <div class="form-row">
+                <label>相似度阈值</label>
+                <el-slider v-model="kbConfig.threshold" :min="0.1" :max="1" :step="0.05" style="width:160px" />
+                <span class="threshold-val">{{ kbConfig.threshold.toFixed(2) }}</span>
+              </div>
+              <p class="config-hint">越高匹配越严格，建议保持在 0.65–0.80；过低会召回无关内容，过高会漏掉相关答案</p>
+            </div>
+            <button class="primary-btn mt12" @click="saveKbConfig">保存配置</button>
+          </div>
+        </template>
+
+        <!-- ── FAQ 问答 Tab ── -->
+        <template v-else-if="kbTab === 'faq'">
+          <!-- 工具栏 -->
+          <div class="card mb16">
+            <div class="kb-toolbar">
+              <div class="cat-tabs">
+                <button v-for="c in faqCats" :key="c"
+                  :class="['cat-btn', { active: faqCatFilter === c }]"
+                  @click="faqCatFilter = c">{{ c }}</button>
+              </div>
+              <div class="kb-toolbar-right">
+                <div class="search-wrap">
+                  <Search :size="13" :stroke-width="1.5" class="search-ico" aria-hidden="true" />
+                  <input v-model="faqSearchQ" class="search-input" placeholder="搜索问答…" aria-label="搜索问答" />
+                </div>
+                <button class="primary-btn" @click="startAddFaq">
+                  <Plus :size="13" :stroke-width="2" />新增问答
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 新增表单 -->
+          <div v-if="faqAdding" class="card mb16 edit-form-card">
+            <div class="card-title"><Plus :size="14" :stroke-width="1.5" />新增问答</div>
+            <div class="edit-form">
+              <div class="edit-row">
+                <label>问题</label>
+                <input v-model="faqAddForm.q" class="edit-input" placeholder="输入游客常见问题…" />
+              </div>
+              <div class="edit-row edit-row-grow">
+                <label>答案</label>
+                <el-input v-model="faqAddForm.a" type="textarea" :rows="3" placeholder="输入详细答案…" />
+              </div>
+              <div class="edit-row">
+                <label>分类</label>
+                <el-select v-model="faqAddForm.cat" size="small" style="width:150px">
+                  <el-option v-for="c in faqCats.slice(1)" :key="c" :label="c" :value="c" />
+                </el-select>
+              </div>
+            </div>
+            <div class="edit-actions">
+              <button class="ghost-btn" @click="faqAdding = false"><X :size="13" :stroke-width="1.5" />取消</button>
+              <button class="primary-btn" @click="saveAddFaq"><Check :size="13" :stroke-width="2" />保存</button>
+            </div>
+          </div>
+
+          <!-- FAQ 列表 -->
+          <div class="card">
+            <div v-if="filteredFaq.length === 0" class="empty-state">
+              <HelpCircle :size="28" :stroke-width="1" />
+              <p>暂无问答，点击「新增问答」开始添加</p>
+            </div>
+            <div v-else class="faq-list">
+              <div v-for="(item, idx) in filteredFaq" :key="item.id"
+                :class="['faq-item', { editing: faqEditId === item.id, last: idx === filteredFaq.length-1 }]">
+
+                <!-- 查看态 -->
+                <template v-if="faqEditId !== item.id">
+                  <div class="faq-view">
+                    <div class="faq-q"><HelpCircle :size="12" class="faq-ico" />{{ item.q }}</div>
+                    <div class="faq-a">{{ item.a }}</div>
+                    <div class="faq-foot">
+                      <span class="cat-badge">{{ item.cat }}</span>
+                      <span class="item-date">{{ item.updated }}</span>
+                      <div class="item-ops">
+                        <button class="link-btn" @click="startEditFaq(item)">编辑</button>
+                        <button class="link-btn danger" @click="deleteFaqItem(item)">删除</button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- 编辑态 -->
+                <template v-else>
+                  <div class="edit-form">
+                    <div class="edit-row">
+                      <label>问题</label>
+                      <input v-model="faqEditForm.q" class="edit-input" />
+                    </div>
+                    <div class="edit-row edit-row-grow">
+                      <label>答案</label>
+                      <el-input v-model="faqEditForm.a" type="textarea" :rows="3" />
+                    </div>
+                    <div class="edit-row">
+                      <label>分类</label>
+                      <el-select v-model="faqEditForm.cat" size="small" style="width:150px">
+                        <el-option v-for="c in faqCats.slice(1)" :key="c" :label="c" :value="c" />
+                      </el-select>
+                    </div>
+                  </div>
+                  <div class="edit-actions">
+                    <button class="ghost-btn" @click="faqEditId = null"><X :size="13" :stroke-width="1.5" />取消</button>
+                    <button class="primary-btn" @click="saveEditFaq(item)"><Check :size="13" :stroke-width="2" />保存</button>
+                  </div>
+                </template>
+              </div>
+            </div>
+            <div class="kb-summary">共 {{ faqItems.length }} 条问答</div>
+          </div>
+        </template>
+
+        <!-- ── 文本段落 Tab ── -->
+        <template v-else-if="kbTab === 'text'">
+          <!-- 工具栏 -->
+          <div class="card mb16">
+            <div class="kb-toolbar">
+              <div class="cat-tabs">
+                <button v-for="c in ['全部', ...textCats]" :key="c"
+                  :class="['cat-btn', { active: textCatFilter === c }]"
+                  @click="textCatFilter = c">{{ c }}</button>
+              </div>
+              <button class="primary-btn" @click="startAddText">
+                <Plus :size="13" :stroke-width="2" />新增段落
+              </button>
+            </div>
+          </div>
+
+          <!-- 新增表单 -->
+          <div v-if="textAdding" class="card mb16 edit-form-card">
+            <div class="card-title"><Plus :size="14" :stroke-width="1.5" />新增文本段落</div>
+            <div class="edit-form">
+              <div class="edit-row-double">
+                <div class="edit-row" style="flex:1">
+                  <label>标题</label>
+                  <input v-model="textAddForm.title" class="edit-input" placeholder="段落标题…" />
+                </div>
+                <div class="edit-row">
+                  <label>分类</label>
+                  <el-select v-model="textAddForm.cat" size="small" style="width:150px">
+                    <el-option v-for="c in textCats" :key="c" :label="c" :value="c" />
+                  </el-select>
+                </div>
+              </div>
+              <div class="edit-row edit-row-grow">
+                <label>内容</label>
+                <div style="flex:1">
+                  <el-input v-model="textAddForm.content" type="textarea" :rows="6" placeholder="输入知识内容…" />
+                  <div class="char-count">{{ textAddForm.content.length }} 字</div>
+                </div>
+              </div>
+            </div>
+            <div class="edit-actions">
+              <button class="ghost-btn" @click="textAdding = false"><X :size="13" :stroke-width="1.5" />取消</button>
+              <button class="primary-btn" @click="saveAddText"><Check :size="13" :stroke-width="2" />保存</button>
+            </div>
+          </div>
+
+          <!-- 文本列表 -->
+          <div v-if="filteredText.length === 0" class="card empty-state">
+            <PenLine :size="28" :stroke-width="1" />
+            <p>暂无文本段落，点击「新增段落」开始添加</p>
+          </div>
+          <div v-else class="text-grid">
+            <div v-for="item in filteredText" :key="item.id" class="card text-card">
+              <!-- 查看态 -->
+              <template v-if="textEditId !== item.id">
+                <div class="text-view-header">
+                  <span class="text-title">{{ item.title }}</span>
+                  <span class="cat-badge">{{ item.cat }}</span>
+                </div>
+                <p class="text-preview">{{ item.content }}</p>
+                <div class="faq-foot">
+                  <span class="item-date">{{ item.updated }}</span>
+                  <span class="char-hint">{{ item.content.length }} 字</span>
+                  <div class="item-ops">
+                    <button class="link-btn" @click="startEditText(item)">编辑</button>
+                    <button class="link-btn danger" @click="deleteTextItem(item)">删除</button>
+                  </div>
+                </div>
+              </template>
+
+              <!-- 编辑态 -->
+              <template v-else>
+                <div class="edit-form">
+                  <div class="edit-row-double">
+                    <div class="edit-row" style="flex:1">
+                      <label>标题</label>
+                      <input v-model="textEditForm.title" class="edit-input" />
+                    </div>
+                    <div class="edit-row">
+                      <label>分类</label>
+                      <el-select v-model="textEditForm.cat" size="small" style="width:150px">
+                        <el-option v-for="c in textCats" :key="c" :label="c" :value="c" />
+                      </el-select>
+                    </div>
+                  </div>
+                  <div class="edit-row edit-row-grow">
+                    <label>内容</label>
+                    <div style="flex:1">
+                      <el-input v-model="textEditForm.content" type="textarea" :rows="6" />
+                      <div class="char-count">{{ textEditForm.content.length }} 字</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="edit-actions">
+                  <button class="ghost-btn" @click="textEditId = null"><X :size="13" :stroke-width="1.5" />取消</button>
+                  <button class="primary-btn" @click="saveEditText(item)"><Check :size="13" :stroke-width="2" />保存</button>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- ═══ 数据大屏 ═══ -->
+      <Teleport to="body">
+      <div v-show="activeTab === 'dashboard'" class="tab-dashboard-screen">
+
+        <!-- 顶部标题栏 -->
+        <header class="dsh-hd">
+          <div class="dsh-hd-l">
+            <span class="dsh-scenic">{{ sceneStore.scenicName || '景区智能服务' }}</span>
+            <div class="dsh-ranges">
+              <button v-for="r in ranges" :key="r.val"
+                :class="['dsh-rb', { active: dashRange === r.val }]"
+                @click="dashRange=r.val; refreshDashboard()">{{ r.label }}</button>
+            </div>
+          </div>
+          <div class="dsh-hd-c">
+            <span class="dsh-deco-line"></span>
+            景区智能服务数据大屏
+            <span class="dsh-deco-line dsh-deco-r"></span>
+          </div>
+          <div class="dsh-hd-r">
+            <span class="dsh-hdate">{{ dashDate }}</span>
+            <span class="dsh-htime">{{ dashClock }}</span>
+            <button class="dsh-hbtn" @click="refreshDashboard" :disabled="dashLoading" title="刷新">
+              <RefreshCw :size="12" :class="{ spin: dashLoading }" />
+            </button>
+            <button class="dsh-hbtn dsh-exit" @click="activeTab = 'avatar'" title="退出大屏">
+              <X :size="12" />
+            </button>
+          </div>
+        </header>
+
+        <!-- 错误提示 -->
+        <div v-if="dashError" class="dsh-error-bar">
+          <AlertCircle :size="13" />&nbsp;数据加载失败，请检查网络连接
+          <button @click="dashError=false; loadDashboard()">重试</button>
+        </div>
+
+        <!-- 主体布局 -->
+        <div class="dsh-body" :key="chartAnimKey">
+
+          <!-- 左列 -->
+          <div class="dsh-col">
+            <!-- KPI -->
+            <div class="dsh-panel">
+              <div class="dsh-phd">核心指标</div>
+              <div class="dsh-kpi-grid">
+                <div class="dsh-kpi" v-for="k in kpiList" :key="k.label">
+                  <div class="dsh-kpi-ico" :style="{ color: k.color }">
+                    <component :is="k.icon" :size="18" :stroke-width="1.5" />
+                  </div>
+                  <div class="dsh-kpi-body">
+                    <div class="dsh-kpi-val" :style="{ color: k.color }">{{ k.value }}</div>
+                    <div class="dsh-kpi-lbl">{{ k.label }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- 功能使用率 -->
+            <div class="dsh-panel dsh-pf">
+              <div class="dsh-phd">功能使用率
+                <span class="dsh-pmeta">活跃会话 {{ featureData.active_sessions ?? '--' }}</span>
+              </div>
+              <div ref="ecFeatures" class="dsh-ec dsh-ec-sm"></div>
+            </div>
+            <!-- 客群画像 -->
+            <div class="dsh-panel dsh-pf">
+              <div class="dsh-phd">客群画像</div>
+              <div ref="ecProfile" class="dsh-ec dsh-ec-sm"></div>
+            </div>
+          </div>
+
+          <!-- 中列 -->
+          <div class="dsh-col dsh-col-c">
+            <!-- 趋势主图 -->
+            <div class="dsh-panel dsh-pm">
+              <div class="dsh-phd">近7日交互趋势</div>
+              <div ref="ecLine" class="dsh-ec dsh-ec-main"></div>
+            </div>
+            <!-- 情感 + 满意度 -->
+            <div class="dsh-r2">
+              <div class="dsh-panel dsh-pf">
+                <div class="dsh-phd">情感分布</div>
+                <div ref="ecDonut" class="dsh-ec dsh-ec-md"></div>
+              </div>
+              <div class="dsh-panel dsh-pf">
+                <div class="dsh-phd">游客满意度
+                  <span class="dsh-sat-n">{{ avgSatisfaction || '--' }}<small v-if="avgSatisfaction"> /5</small></span>
+                </div>
+                <div ref="ecSat" class="dsh-ec dsh-ec-md"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右列 -->
+          <div class="dsh-col">
+            <div class="dsh-panel dsh-pf">
+              <div class="dsh-phd">热门话题 Top 5</div>
+              <div ref="ecTopics" class="dsh-ec dsh-ec-lg"></div>
+            </div>
+            <div class="dsh-panel dsh-pf">
+              <div class="dsh-phd">景点关注度</div>
+              <div ref="ecSpots" class="dsh-ec dsh-ec-lg"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      </Teleport>
+      <!-- ═══ 感受度报告 ═══ -->
+      <div v-show="activeTab === 'report'" class="tab-content">
+        <div class="page-header">
+          <h2>感受度报告</h2>
+          <span class="page-sub">游客情感分析与服务优化建议</span>
+          <div class="header-actions">
+            <button class="ghost-btn sm" @click="refreshReport" :disabled="reportLoading">
+              <RefreshCw :size="12" :stroke-width="1.5" :class="{ spin: reportLoading }" />刷新
+            </button>
+          </div>
+        </div>
+
+        <!-- loading 遮罩 -->
+        <div v-if="reportLoading" class="report-loading">
+          <Loader2 :size="22" :stroke-width="1.5" class="spin" />
+          <span>数据加载中…</span>
+        </div>
+        <div v-else-if="reportError" class="dash-error-banner">
+          <AlertCircle :size="14" :stroke-width="1.5" />
+          数据加载失败，请检查网络连接或后端服务
+          <button class="ghost-btn sm" style="margin-left:auto" @click="reportError=false; loadReport()">重试</button>
+        </div>
+        <template v-else>
+
+        <!-- 摘要 -->
+        <div class="summary-strip">
+          <div v-for="s in reportSummary" :key="s.label" class="summary-metric">
+            <span class="metric-num" :style="{ color: s.color }">{{ s.val }}</span>
+            <span class="metric-label">{{ s.label }}</span>
+          </div>
+        </div>
+
+        <div class="two-col mt16">
+          <!-- 情感分布 -->
+          <div class="card">
+            <div class="card-title"><Activity :size="14" :stroke-width="1.5" />情感分布</div>
+            <div class="emotion-dist">
+              <div v-for="e in emotionDist" :key="e.label" class="emo-item">
+                <div class="emo-bar-track">
+                  <div class="emo-bar-fill" :style="{ width: e.pct+'%', background: e.color }" />
+                </div>
+                <div class="emo-meta">
+                  <span class="emo-label">{{ e.label }}</span>
+                  <span class="emo-pct" :style="{ color: e.color }">{{ e.pct }}%</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-divider">近7日情感趋势</div>
+            <div class="trend-stacks">
+              <div v-for="(d,i) in emotionTrendData" :key="i" class="stack-col">
+                <div class="stack-bar">
+                  <div class="seg positive" :style="{ flex: d.positive }" />
+                  <div class="seg neutral"  :style="{ flex: d.neutral  }" />
+                  <div class="seg negative" :style="{ flex: d.negative }" />
+                </div>
+                <span>{{ d.day }}</span>
+              </div>
+            </div>
+            <div class="stack-legend">
+              <span class="leg pos">积极</span>
+              <span class="leg neu">中性</span>
+              <span class="leg neg">消极</span>
+            </div>
+          </div>
+
+          <!-- 关注点 -->
+          <div class="card">
+            <div class="card-title"><Search :size="14" :stroke-width="1.5" />游客关注点</div>
+            <div class="tag-cloud">
+              <span v-for="c in concernTags" :key="c.tag" class="cloud-tag"
+                :style="{ fontSize:(12+c.weight*7)+'px', color:c.color, opacity:0.5+c.weight*0.5 }">
+                {{ c.tag }}
+              </span>
+            </div>
+            <div class="section-divider">关注点排名</div>
+            <div class="concern-rows">
+              <div v-for="(c,i) in topConcerns" :key="i" class="concern-row">
+                <span class="c-rank">{{ i+1 }}</span>
+                <span class="c-name">{{ c.name }}</span>
+                <div class="c-track"><div class="c-fill" :style="{ width: c.pct+'%' }" /></div>
+                <span class="c-pct">{{ c.pct }}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 优化建议 -->
+        <div class="card mt16">
+          <div class="card-title"><Lightbulb :size="14" :stroke-width="1.5" />AI服务优化建议</div>
+          <div class="suggestion-list">
+            <div v-for="(s,i) in serviceSuggestions" :key="i" class="sug-item" :class="s.priority">
+              <span class="sug-badge">{{ { high:'高优', mid:'中优', low:'低优' }[s.priority] }}</span>
+              <div class="sug-body">
+                <div class="sug-title">{{ s.title }}</div>
+                <div class="sug-desc">{{ s.desc }}</div>
+              </div>
+              <span class="sug-impact">+{{ s.impact }}% 满意度</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 对话摘录 -->
+        <div class="card mt16">
+          <div class="card-title"><MessageSquare :size="14" :stroke-width="1.5" />典型对话摘录</div>
+          <div v-if="dialogueSamples.length" class="dialogue-list">
+            <div v-for="(d,i) in dialogueSamples" :key="i" class="dialogue-item">
+              <div class="dlg-meta">
+                <span class="dlg-time">{{ d.time }}</span>
+                <span class="sentiment-tag" :class="d.sentiment">
+                  {{ { positive:'积极', negative:'消极', neutral:'中性' }[d.sentiment] }}
+                </span>
+              </div>
+              <div class="dlg-q">{{ d.question }}</div>
+              <div class="dlg-a">{{ d.answer }}</div>
+            </div>
+          </div>
+          <div v-else class="empty-state">
+            <MessageSquare :size="24" :stroke-width="1" />
+            <p>暂无对话记录</p>
+          </div>
+        </div>
+        </template>
+      </div>
+
+    </main>
+
+    <!-- ── AI 分析助手面板 ── -->
+    <aside class="ai-panel" :class="{ collapsed: !aiPanelOpen }">
+      <div class="ai-panel-header">
+        <button class="ai-toggle-btn" @click="aiPanelOpen = !aiPanelOpen" :title="aiPanelOpen ? '收起助手' : '展开助手'">
+          <ChevronRight :size="13" :stroke-width="2" :class="{ flipped: !aiPanelOpen }" />
+        </button>
+        <Sparkles :size="13" :stroke-width="1.5" class="ai-header-ico" aria-hidden="true" />
+        <span class="ai-header-title">智能分析助手</span>
+        <span class="ai-online-dot" aria-hidden="true" />
+      </div>
+
+      <div class="ai-messages" ref="aiChatEl">
+        <div v-if="aiMessages.length === 0" class="ai-welcome">
+          <div class="ai-bot-icon"><Bot :size="22" :stroke-width="1" aria-hidden="true" /></div>
+          <p class="ai-welcome-title">景区数据分析助手</p>
+          <p class="ai-welcome-sub">可询问运营数据解读、游客情感分析、知识库优化建议等</p>
+          <div class="ai-quick-list">
+            <button v-for="q in aiQuickQuestions" :key="q" class="ai-quick-chip" @click="sendQuickQuestion(q)">{{ q }}</button>
+          </div>
+        </div>
+
+        <template v-else>
+          <div v-for="msg in aiMessages" :key="msg.id" :class="['ai-msg-row', msg.role]">
+            <div v-if="msg.role === 'assistant'" class="ai-msg-icon">
+              <Bot :size="11" :stroke-width="1.5" />
+            </div>
+            <div :class="['ai-bubble', msg.role, { error: msg.error }]">
+              <span v-if="msg.loading" class="ai-typing-dots"><i /><i /><i /></span>
+              <span v-else>{{ msg.content }}</span>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <div class="ai-input-wrap">
+        <textarea
+          v-model="aiInput"
+          ref="aiTextareaEl"
+          class="ai-input"
+          placeholder="向AI助手提问…"
+          aria-label="向AI助手提问"
+          rows="1"
+          :disabled="aiLoading"
+          @keydown.enter.exact.prevent="sendAiMessage"
+          @input="autoResizeTextarea"
+        />
+        <button
+          class="ai-send"
+          :class="{ active: aiInput.trim() && !aiLoading }"
+          :disabled="!aiInput.trim() || aiLoading"
+          aria-label="发送"
+          @click="sendAiMessage"
+        >
+          <Send :size="13" :stroke-width="2" aria-hidden="true" />
+        </button>
+      </div>
+    </aside>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import * as echarts from 'echarts'
+import { useSceneStore } from '@/stores/scene'
+import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import axios from 'axios'
+import {
+  Signal, Home,
+  Landmark, MapPin, Wand2, Eye, Users, UserCircle, UserX,
+  Upload, UploadCloud, FileText, Search, Settings2, RefreshCw,
+  BarChart2, MessageSquare, Star, TrendingUp, TrendingDown,
+  Activity, Lightbulb, Check, LogOut,
+  CheckCircle, Sparkles, Loader2, AlertCircle,
+  HelpCircle, PenLine, Plus, X,
+  Bot, Send, Clock, ChevronRight,
+  Shirt, Volume2, Save, Sun, Moon
+} from 'lucide-vue-next'
+import mpegts from 'mpegts.js'
+import {
+  getDigitalHumanPresets, getDigitalHumanConfig, saveDigitalHumanConfig,
+  liveSetAvatar, PORTRAIT_FLV,
+} from '@/api/index'
+
+const sceneStore = useSceneStore()
+const authStore  = useAuthStore()
+const router     = useRouter()
+
+const activeTab   = ref(localStorage.getItem('adminTab') || 'avatar')
+const chartAnimKey = ref(0)
+watch(activeTab, async (tab) => {
+  localStorage.setItem('adminTab', tab)
+  if (tab === 'dashboard') {
+    chartAnimKey.value++          // key++ 销毁旧 DOM，先清 ECharts 实例
+    Object.values(_ec).forEach(c => c?.dispose())
+    _ec = {}
+    if (!dashLoaded.value) {
+      loadDashboard()
+    } else {
+      await nextTick()            // 等新 DOM 就绪后重绘
+      _ecUpdate()
+    }
+  }
+  if (tab === 'report') {
+    if (!reportLoaded.value) loadReport()
+  }
+  if (tab === 'avatar') {
+    await loadAvatarTab()
+    await nextTick()
+    startPreview()
+  } else {
+    destroyPreview()
+  }
+})
+
+const navItems = [
+  { key:'avatar',    label:'形象管理', icon: Wand2 },
+  { key:'knowledge', label:'知识库',   icon: FileText },
+  { key:'dashboard', label:'数据大屏', icon: BarChart2 },
+  { key:'report',    label:'感受度报告', icon: Activity },
+]
+
+function handleLogout() { authStore.logout(router) }
+
+// ── 形象管理（形象库 + 换装 + 音色 + 背景 + 实时预览 + 设默认）──────────────
+const AV_STYLES = ['推荐', '现代', '古风', '民族']
+const SWEET_BASE = 'female_sweet'
+const SWEET_OUTFITS = ['outfit_qipao', 'outfit_hanfu', 'outfit_blazer', 'outfit_ethnic', 'outfit_vest', 'outfit_coat']
+
+const avatars = ref([]); const voices = ref([]); const backgrounds = ref([])
+const avStyle = ref('推荐'); const avGender = ref('all')
+const selAvatar = ref(''); const selVoice = ref(''); const selBg = ref('')
+const applying = ref(false); const saving = ref(false)
+const previewVideoEl = ref(null); let flvPlayer = null
+
+const identities = computed(() => avatars.value.filter(a => !SWEET_OUTFITS.includes(a.id)))
+const shownAvatars = computed(() => identities.value.filter(a =>
+  (avStyle.value === '推荐' ? a.recommended : a.style === avStyle.value) &&
+  (avGender.value === 'all' || a.gender === avGender.value)))
+const outfits = computed(() => {
+  if (selAvatar.value !== SWEET_BASE && !SWEET_OUTFITS.includes(selAvatar.value)) return []
+  const byId = new Map(avatars.value.map(a => [a.id, a]))
+  return [SWEET_BASE, ...SWEET_OUTFITS].map(id => byId.get(id)).filter(Boolean)
+})
+const selAvatarName = computed(() => avatars.value.find(a => a.id === selAvatar.value)?.name || '')
+const selVoiceName = computed(() => voices.value.find(v => v.id === selVoice.value)?.name || '')
+
+async function loadAvatarTab() {
+  try {
+    const p = await getDigitalHumanPresets()
+    avatars.value = (p.avatars || []).filter(a => !a.legacy)
+    voices.value = p.voices || []
+    backgrounds.value = p.backgrounds || []
+    const cfg = await getDigitalHumanConfig(sceneStore.scenicId)
+    selAvatar.value = cfg.avatar_id || SWEET_BASE
+    selVoice.value = cfg.voice_id || 'voice_gentle_f'
+    selBg.value = cfg.background_id || ''
+  } catch { ElMessage.error('加载形象库失败') }
+}
+
+async function pickAvatar(a) {
+  if (a.coming_soon) return
+  selAvatar.value = a.id
+  applying.value = true
+  const r = await liveSetAvatar(a.id, sceneStore.scenicId, 'portrait')
+  applying.value = false
+  if (!r || !r.ok) ElMessage.warning('预览切换失败（大屏流可能未就绪，点「重连预览」重试）')
+}
+
+async function saveDefault() {
+  if (!selAvatar.value) return
+  saving.value = true
+  try {
+    const av = avatars.value.find(a => a.id === selAvatar.value)
+    const vc = voices.value.find(v => v.id === selVoice.value)
+    const bg = backgrounds.value.find(b => b.id === selBg.value)
+    await saveDigitalHumanConfig({
+      scenic_id: sceneStore.scenicId,
+      avatar_id: selAvatar.value, avatar_name: av?.name || selAvatar.value,
+      voice_id: selVoice.value, voice_name: vc?.name || '',
+      background_id: selBg.value || '', background_name: bg?.name || '',
+    })
+    ElMessage.success(`已设为「${sceneStore.scenicName || sceneStore.scenicId}」默认形象`)
+  } catch { ElMessage.error('保存失败') }
+  finally { saving.value = false }
+}
+
+function startPreview() {
+  if (!previewVideoEl.value || !mpegts.isSupported()) return
+  destroyPreview()
+  try {
+    flvPlayer = mpegts.createPlayer(
+      { type: 'flv', isLive: true, url: PORTRAIT_FLV },
+      { liveBufferLatencyChasing: true, lazyLoad: false })
+    flvPlayer.attachMediaElement(previewVideoEl.value)
+    flvPlayer.load()
+    flvPlayer.play().catch(() => {})
+  } catch {}
+}
+function destroyPreview() { if (flvPlayer) { try { flvPlayer.destroy() } catch {} flvPlayer = null } }
+function reloadPreview() { startPreview() }
+
+// AI 生成专属向导（通义万相）→ 烘录入库（真入库 pipeline 开发中，当前先出预览图）
+const customPrompt = ref('')
+const genProgress  = ref(0)
+let progressTimer = null
+async function handleGenerate() {
+  genProgress.value = 0
+  progressTimer = setInterval(() => { genProgress.value = Math.min(genProgress.value + 3, 90) }, 500)
+  try {
+    await sceneStore.generateAvatar(null, customPrompt.value || null)
+    genProgress.value = 100
+    ElMessage.success('形象已生成（烘录入库链路开发中）')
+  } catch { ElMessage.error('生成失败，请检查 DashScope 余额/Key') }
+  finally { clearInterval(progressTimer) }
+}
+
+// ── 知识库管理 ─────────────────────────────────
+const kbSearch = ref('')
+const kbConfig = ref({ strategy:'semantic', topK:5, threshold:0.7 })
+
+const knowledgeDocs = ref([])
+
+const statusMap = { indexed:'已索引', indexing:'索引中', unsupported:'不支持', '已上传':'已上传' }
+function fmtDoc(d) {
+  const ext = (d.filename || '').split('.').pop().toLowerCase()
+  const bytes = d.size_bytes || 0
+  const size = bytes < 1024 ? `${bytes}B` : bytes < 1024**2 ? `${(bytes/1024).toFixed(1)}KB` : `${(bytes/1024**2).toFixed(1)}MB`
+  return {
+    id: d.id,
+    name: d.filename || d.name,
+    type: ext,
+    chunks: d.chunks ?? '-',
+    uploadTime: (d.created_at || d.uploadTime || '').slice(0, 16).replace('T', ' '),
+    size,
+    sizeBytes: bytes,
+    status: statusMap[d.status] || d.status,
+  }
+}
+
+async function loadKnowledgeDocs() {
+  try {
+    const params = sceneStore.scenicId ? { scenic_id: sceneStore.scenicId } : {}
+    const res = await axios.get('/api/knowledge/docs', { params })
+    if (res.data.code === 0) knowledgeDocs.value = (res.data.data?.docs || []).map(fmtDoc)
+  } catch { /* 后端未启动时静默 */ }
+}
+
+const filteredDocs = computed(() =>
+  kbSearch.value ? knowledgeDocs.value.filter(d => d.name.includes(kbSearch.value) || d.type.includes(kbSearch.value))
+                 : knowledgeDocs.value
+)
+
+const totalSize = computed(() => {
+  const bytes = knowledgeDocs.value.reduce((a, d) => a + (d.sizeBytes || 0), 0)
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)}KB`
+  return `${(bytes / 1024 ** 2).toFixed(1)}MB`
+})
+
+function beforeUpload(file) {
+  if (file.size / 1024 / 1024 > 20) { ElMessage.error('文件不能超过 20MB'); return false }
+  return true
+}
+
+async function handleKnowledgeUpload({ file }) {
+  const formData = new FormData()
+  formData.append('files', file)
+  formData.append('scenic_id', sceneStore.scenicId || 'lingshan')
+  try {
+    const res = await axios.post('/api/knowledge/upload', formData)
+    if (res.data.code === 0) {
+      await loadKnowledgeDocs()
+      const items = res.data.data?.items || []
+      const unsupported = items.filter(i => i.status === 'unsupported')
+      if (unsupported.length) ElMessage.warning(`${unsupported.map(i=>i.filename).join('、')} 无文本层，未入库`)
+      else ElMessage.success(`上传成功，共 ${items.reduce((a,i)=>a+(i.chunks||0),0)} 个片段已索引`)
+    }
+  } catch (e) {
+    ElMessage.error('上传失败：' + (e.response?.data?.detail || e.message))
+  }
+}
+
+const docDeletePending = ref(null)
+let _docDeleteTimer = null
+
+async function deleteDoc(row) {
+  await ElMessageBox.confirm(
+    `「${row.name}」删除后无法恢复。`,
+    '删除文档', { type:'warning', confirmButtonText:'删除', cancelButtonText:'取消' }
+  )
+  knowledgeDocs.value = knowledgeDocs.value.filter(d => d.id !== row.id)
+  docDeletePending.value = row
+  clearTimeout(_docDeleteTimer)
+  _docDeleteTimer = setTimeout(async () => {
+    if (!docDeletePending.value) return
+    try { await axios.delete(`/api/knowledge/docs/${docDeletePending.value.id}`) }
+    catch { await loadKnowledgeDocs(); ElMessage.error('删除失败，文档已恢复') }
+    docDeletePending.value = null
+  }, 5000)
+}
+
+function undoDeleteDoc() {
+  clearTimeout(_docDeleteTimer)
+  if (docDeletePending.value) {
+    knowledgeDocs.value = [docDeletePending.value, ...knowledgeDocs.value]
+    docDeletePending.value = null
+    ElMessage.success('已撤销')
+  }
+}
+
+function rebuildDoc(row) {
+  row.status = '索引中'
+  setTimeout(() => { row.status = '已索引' }, 2000)
+  ElMessage.info('正在重新解析文档…')
+}
+
+function reindexDoc(row) {
+  row.status = '索引中'
+  setTimeout(() => { row.status = '已索引' }, 1500)
+  ElMessage.info('正在重建检索索引…')
+}
+
+function saveKbConfig() { ElMessage.success('检索配置已保存') }
+
+// ── 知识库子 Tab ──────────────────────────────
+const kbTab = ref('upload')
+
+// ── FAQ 问答 ──────────────────────────────────
+const faqCats    = ['全部', '基础信息', '景点介绍', '票务信息', '交通停车', '餐饮服务', '历史文化']
+const faqCatFilter = ref('全部')
+const faqSearchQ   = ref('')
+
+const faqItems = ref([])
+
+async function loadFaq() {
+  try {
+    const params = sceneStore.scenicId ? { scenic_id: sceneStore.scenicId } : {}
+    const res = await axios.get('/api/knowledge/faq', { params })
+    if (res.data.code === 0) {
+      faqItems.value = (res.data.data || []).map(f => ({
+        id: f.id, q: f.question, a: f.answer, cat: f.category, updated: f.updated_at?.slice(0,10) || ''
+      }))
+    }
+  } catch { /* 静默 */ }
+}
+
+const filteredFaq = computed(() => {
+  let list = faqItems.value
+  if (faqCatFilter.value !== '全部') list = list.filter(f => f.cat === faqCatFilter.value)
+  if (faqSearchQ.value) {
+    const q = faqSearchQ.value
+    list = list.filter(f => f.q.includes(q) || f.a.includes(q))
+  }
+  return list
+})
+
+const faqAdding  = ref(false)
+const faqAddForm = ref({ q:'', a:'', cat:'基础信息' })
+const faqEditId  = ref(null)
+const faqEditForm = ref({ q:'', a:'', cat:'基础信息' })
+
+function startAddFaq() { faqAdding.value = true; faqAddForm.value = { q:'', a:'', cat:'基础信息' } }
+async function saveAddFaq() {
+  if (!faqAddForm.value.q.trim() || !faqAddForm.value.a.trim()) { ElMessage.error('问题和答案不能为空'); return }
+  try {
+    await axios.post('/api/knowledge/faq', {
+      scenic_id: sceneStore.scenicId || 'lingshan',
+      question: faqAddForm.value.q,
+      answer: faqAddForm.value.a,
+      category: faqAddForm.value.cat,
+    })
+    faqAdding.value = false
+    await loadFaq()
+    ElMessage.success('已添加')
+  } catch (e) { ElMessage.error('添加失败：' + (e.response?.data?.detail || e.message)) }
+}
+function startEditFaq(item) {
+  faqEditId.value = item.id
+  faqEditForm.value = { q: item.q, a: item.a, cat: item.cat }
+}
+async function saveEditFaq(item) {
+  if (!faqEditForm.value.q.trim() || !faqEditForm.value.a.trim()) { ElMessage.error('问题和答案不能为空'); return }
+  try {
+    await axios.put(`/api/knowledge/faq/${item.id}`, {
+      scenic_id: sceneStore.scenicId || 'lingshan',
+      question: faqEditForm.value.q,
+      answer: faqEditForm.value.a,
+      category: faqEditForm.value.cat,
+    })
+    faqEditId.value = null
+    await loadFaq()
+    ElMessage.success('已保存')
+  } catch (e) { ElMessage.error('保存失败：' + (e.response?.data?.detail || e.message)) }
+}
+async function deleteFaqItem(item) {
+  await ElMessageBox.confirm(`「${item.q}」删除后无法恢复。`, '删除问答', { type:'warning', confirmButtonText:'删除', cancelButtonText:'取消' })
+  try {
+    await axios.delete(`/api/knowledge/faq/${item.id}`)
+    faqItems.value = faqItems.value.filter(f => f.id !== item.id)
+    ElMessage.success('已删除')
+  } catch (e) { ElMessage.error('删除失败：' + (e.response?.data?.detail || e.message)) }
+}
+
+// ── 文本段落 ──────────────────────────────────
+const textCats     = ['景区概况', '景点讲解', '历史文化', '服务信息', '活动介绍']
+const textCatFilter = ref('全部')
+
+const textItems = ref([])
+
+async function loadText() {
+  try {
+    const params = sceneStore.scenicId ? { scenic_id: sceneStore.scenicId } : {}
+    const res = await axios.get('/api/knowledge/text', { params })
+    if (res.data.code === 0) {
+      textItems.value = (res.data.data || []).map(t => ({
+        id: t.id, title: t.title, cat: t.category, content: t.content, updated: t.updated_at?.slice(0,10) || ''
+      }))
+    }
+  } catch { /* 静默 */ }
+}
+
+const filteredText = computed(() => {
+  if (textCatFilter.value === '全部') return textItems.value
+  return textItems.value.filter(t => t.cat === textCatFilter.value)
+})
+
+const textAdding  = ref(false)
+const textAddForm = ref({ title:'', cat:'景区概况', content:'' })
+const textEditId  = ref(null)
+const textEditForm = ref({ title:'', cat:'景区概况', content:'' })
+
+function startAddText() { textAdding.value = true; textAddForm.value = { title:'', cat:'景区概况', content:'' } }
+async function saveAddText() {
+  if (!textAddForm.value.title.trim() || !textAddForm.value.content.trim()) { ElMessage.error('标题和内容不能为空'); return }
+  try {
+    await axios.post('/api/knowledge/text', {
+      scenic_id: sceneStore.scenicId || 'lingshan',
+      title: textAddForm.value.title,
+      content: textAddForm.value.content,
+      category: textAddForm.value.cat,
+    })
+    textAdding.value = false
+    await loadText()
+    ElMessage.success('已添加')
+  } catch (e) { ElMessage.error('添加失败：' + (e.response?.data?.detail || e.message)) }
+}
+function startEditText(item) {
+  textEditId.value = item.id
+  textEditForm.value = { title: item.title, cat: item.cat, content: item.content }
+}
+async function saveEditText(item) {
+  if (!textEditForm.value.title.trim() || !textEditForm.value.content.trim()) { ElMessage.error('标题和内容不能为空'); return }
+  try {
+    await axios.put(`/api/knowledge/text/${item.id}`, {
+      scenic_id: sceneStore.scenicId || 'lingshan',
+      title: textEditForm.value.title,
+      content: textEditForm.value.content,
+      category: textEditForm.value.cat,
+    })
+    textEditId.value = null
+    await loadText()
+    ElMessage.success('已保存')
+  } catch (e) { ElMessage.error('保存失败：' + (e.response?.data?.detail || e.message)) }
+}
+async function deleteTextItem(item) {
+  await ElMessageBox.confirm(`「${item.title}」删除后无法恢复。`, '删除段落', { type:'warning', confirmButtonText:'删除', cancelButtonText:'取消' })
+  try {
+    await axios.delete(`/api/knowledge/text/${item.id}`)
+    textItems.value = textItems.value.filter(t => t.id !== item.id)
+    ElMessage.success('已删除')
+  } catch (e) { ElMessage.error('删除失败：' + (e.response?.data?.detail || e.message)) }
+}
+
+// ── 数据大屏 ─────────────────────────────────
+const ANALYTICS_BASE = '/cloud'
+
+const dashRange      = ref('today')
+const dashLoading    = ref(false)
+
+// 顶部导航栏
+const tnLang  = ref('zh')
+const tnLangs = [
+  { val: 'zh', label: '中' },
+  { val: 'en', label: 'EN' },
+  { val: 'ja', label: '日' },
+  { val: 'ko', label: '한' },
+]
+const tnTime     = ref('')
+const tnGpsLabel = ref('一般')
+
+let _tnTimer = null
+function _updateTnTime() {
+  const now = new Date()
+  tnTime.value = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0')
+}
+
+// ── ECharts ──────────────────────────────────────────────────────────
+const ecLine     = ref(null)
+const ecDonut    = ref(null)
+const ecSat      = ref(null)
+const ecTopics   = ref(null)
+const ecSpots    = ref(null)
+const ecFeatures = ref(null)
+const ecProfile  = ref(null)
+let _ec = {}
+const EC_COLS = ['#8B5CF6','#22D3EE','#EC4899','#10B981','#F59E0B','#A78BFA','#38BDF8']
+// 霓虹渐变助手（对标深色 CRM 参考图）：gradH 横向、gradV 纵向
+const gradH = (c1, c2) => ({ type:'linear', x:0, y:0, x2:1, y2:0, colorStops:[{offset:0,color:c1},{offset:1,color:c2}] })
+const gradV = (c1, c2) => ({ type:'linear', x:0, y:0, x2:0, y2:1, colorStops:[{offset:0,color:c1},{offset:1,color:c2}] })
+// 每条柱/段的渐变色对（紫/青/粉/绿/琥珀/靛）
+const NEON = [['#7C3AED','#A855F7'],['#0891B2','#22D3EE'],['#BE185D','#EC4899'],['#059669','#34D399'],['#D97706','#FBBF24'],['#4F46E5','#818CF8'],['#0E7490','#38BDF8']]
+const NEON_SOLID = NEON.map(p => p[1])
+
+function _ecInit() {
+  const opt = { renderer: 'canvas' }
+  const map = { line:ecLine, donut:ecDonut, sat:ecSat, topics:ecTopics, spots:ecSpots, features:ecFeatures, profile:ecProfile }
+  for (const [k,r] of Object.entries(map)) {
+    if (!r.value) continue
+    // 若旧实例挂在已分离的 DOM 上，先销毁
+    if (_ec[k] && !document.contains(_ec[k].getDom())) {
+      _ec[k].dispose()
+      delete _ec[k]
+    }
+    if (!_ec[k]) _ec[k] = echarts.init(r.value, null, opt)
+  }
+}
+
+function _ecUpdate() {
+  _ecInit()
+  const EMAP = {
+    positive:'积极',negative:'消极',neutral:'中性',
+    happy:'开心',excited:'兴奋',curious:'好奇',
+    empathetic:'感同身受',apologetic:'歉意',surprised:'惊喜',
+    confused:'困惑',angry:'不满',sad:'失望',fearful:'担忧'
+  }
+  // 主题感知：深色=霓虹渐变，浅色=原版蓝色调（随 <html>.admin-dark 切换）
+  const dark = document.documentElement.classList.contains('admin-dark')
+  const T = dark ? {
+    axis:'#9292B0', split:'rgba(255,255,255,0.06)', axisLine:'rgba(255,255,255,0.10)',
+    tipBg:'#1A1A35', tipBd:'#2A2A48', tipTx:'#ECECF7', ring:'#14142E',
+    line:gradH('#22D3EE','#8B5CF6'), area:gradV('rgba(139,92,246,0.42)','rgba(34,211,238,0.02)'),
+    dot:'#0F0F23', dotBd:'#A78BFA', lineLabel:'#C4B5FD',
+  } : {
+    axis:'#6b7a8d', split:'#f0f4f8', axisLine:'#e0e7ef',
+    tipBg:'#fff', tipBd:'#e5e7eb', tipTx:'#374151', ring:'#fff',
+    line:'#003893', area:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(0,56,147,0.18)'},{offset:1,color:'rgba(0,56,147,0.01)'}]},
+    dot:'#fff', dotBd:'#003893', lineLabel:'#003893',
+  }
+  const ORIG_SOLID = ['#003893','#1565C0','#2D7A4F','#B45309','#6B7280','#BE3535','#0369a1']
+  const barColor = (i) => dark ? gradH(NEON[i%NEON.length][0], NEON[i%NEON.length][1]) : ORIG_SOLID[i%ORIG_SOLID.length]
+  if (_ec.line) {
+    _ec.line.setOption({
+      grid:{top:28,right:16,bottom:32,left:46},
+      tooltip:{trigger:'axis',backgroundColor:T.tipBg,borderColor:T.tipBd,textStyle:{color:T.tipTx,fontSize:12}},
+      xAxis:{type:'category',data:trendData.value.map(d=>d.day),axisLine:{lineStyle:{color:T.axisLine}},axisLabel:{color:T.axis,fontSize:12},axisTick:{show:false}},
+      yAxis:{type:'value',splitLine:{lineStyle:{color:T.split,type:'dashed'}},axisLabel:{color:T.axis,fontSize:11},minInterval:1},
+      series:[{type:'line',smooth:true,symbol:'circle',symbolSize:7,
+        data:trendData.value.map(d=>d.count),
+        lineStyle:{color:T.line,width:dark?3:2.5,shadowColor:dark?'rgba(139,92,246,0.5)':'transparent',shadowBlur:dark?12:0},
+        itemStyle:{color:T.dot,borderColor:T.dotBd,borderWidth:2.5},
+        areaStyle:{color:T.area},
+        label:{show:true,position:'top',color:T.lineLabel,fontSize:11,fontWeight:600}}]
+    })
+  }
+  if (_ec.donut) {
+    const raw = emotionDist.value.length
+      ? emotionDist.value
+      : [{label:'积极',pct:0,color:'#2D7A4F'},{label:'中性',pct:0,color:'#6B7280'},{label:'消极',pct:0,color:'#BE3535'}]
+    const sorted=[...raw].sort((a,b)=>(b.pct||0)-(a.pct||0))
+    const top5=sorted.slice(0,5)
+    const rest=sorted.slice(5)
+    if(rest.length) top5.push({label:'其他',pct:rest.reduce((s,e)=>s+(e.pct||0),0),color:'#9CA3AF'})
+    const ddata=top5.map((e,i)=>({name:EMAP[e.label]||e.label,value:e.pct||0,
+      itemStyle:{color:barColor(i)}}))
+    _ec.donut.setOption({
+      tooltip:{trigger:'item',formatter:'{b}: {d}%',backgroundColor:T.tipBg,borderColor:T.tipBd,textStyle:{color:T.tipTx}},
+      legend:{orient:'horizontal',bottom:0,left:'center',icon:'circle',
+              itemWidth:8,itemHeight:8,itemGap:8,type:'scroll',pageIconSize:10,
+              textStyle:{color:T.axis,fontSize:11}},
+      series:[{type:'pie',radius:['48%','70%'],center:['50%','42%'],data:ddata,
+               itemStyle:{borderColor:T.ring,borderWidth:2,borderRadius:5},
+               label:{show:false},emphasis:{scale:true,scaleSize:4,label:{show:true,fontSize:13,fontWeight:700,color:T.tipTx}}}]
+    })
+  }
+  if (_ec.sat) {
+    _ec.sat.setOption({
+      grid:{top:6,right:44,bottom:6,left:30,containLabel:false},
+      tooltip:{trigger:'axis'},
+      xAxis:{type:'value',show:false},
+      yAxis:{type:'category',data:['1星','2星','3星','4星','5星'],
+             axisLabel:{color:T.axis,fontSize:11},axisLine:{show:false},axisTick:{show:false}},
+      series:[{type:'bar',barMaxWidth:16,barMinHeight:3,
+        data:[1,2,3,4,5].map(s=>({value:starDist.value[s]||0,
+          itemStyle:{color:dark?(s>=4?gradH('#059669','#34D399'):s===3?gradH('#D97706','#FBBF24'):gradH('#BE185D','#FB7185')):(s>=4?'#2D7A4F':s===3?'#B45309':'#BE3535'),borderRadius:[0,5,5,0]}})),
+        label:{show:true,position:'right',formatter:'{c}%',color:T.axis,fontSize:11}}]
+    })
+  }
+  if (_ec.topics) {
+    const top5=hotQAList.value.slice(0,5)
+    const maxV=Math.max(...top5.map(q=>q.count||0),1)
+    _ec.topics.setOption({
+      grid:{top:4,right:36,bottom:4,left:4,containLabel:true},
+      tooltip:{trigger:'axis'},
+      xAxis:{type:'value',show:false,max:maxV*1.3},
+      yAxis:{type:'category',data:top5.map(q=>{const t=q.question||'';return t.length>8?t.slice(0,8)+'..':t}),
+             axisLabel:{color:T.axis,fontSize:11,width:64,overflow:'truncate'},
+             axisLine:{show:false},axisTick:{show:false},inverse:true},
+      series:[{type:'bar',barMaxWidth:14,barMinHeight:4,
+        data:top5.map((q,i)=>({value:q.count,itemStyle:{color:barColor(i),borderRadius:[0,5,5,0]}})),
+        label:{show:true,position:'right',color:T.axis,fontSize:11}}]
+    })
+  }
+  if (_ec.spots) {
+    const sp=spotAttention.value.slice(0,6)
+    const maxV=Math.max(...sp.map(s=>s.pct||0),1)
+    _ec.spots.setOption({
+      grid:{top:4,right:44,bottom:4,left:4,containLabel:true},
+      tooltip:{trigger:'axis'},
+      xAxis:{type:'value',show:false,max:maxV*1.3},
+      yAxis:{type:'category',data:sp.map(s=>s.name),
+             axisLabel:{color:T.axis,fontSize:11,width:56,overflow:'truncate'},
+             axisLine:{show:false},axisTick:{show:false},inverse:true},
+      series:[{type:'bar',barMaxWidth:14,barMinHeight:4,
+        barCategoryGap:sp.length<=3?'50%':'35%',
+        data:sp.map((s,i)=>({value:s.pct,itemStyle:{color:barColor(i),borderRadius:[0,5,5,0]}})),
+        label:{show:true,position:'right',formatter:'{c}%',color:T.axis,fontSize:11}}]
+    })
+  }
+  if (_ec.features) {
+    const feats=Object.entries(featureData.value.feature_open||{}).sort((a,b)=>b[1]-a[1]).slice(0,5)
+    const maxV=Math.max(...feats.map(([,v])=>v),1)
+    _ec.features.setOption({
+      grid:{top:4,right:36,bottom:4,left:4,containLabel:true},
+      tooltip:{trigger:'axis'},
+      xAxis:{type:'value',show:false,max:maxV*1.3},
+      yAxis:{type:'category',data:feats.map(([k])=>featureLabel[k]||k),
+             axisLabel:{color:T.axis,fontSize:11,width:54,overflow:'truncate'},
+             axisLine:{show:false},axisTick:{show:false},inverse:true},
+      series:[{type:'bar',barMaxWidth:14,barMinHeight:4,
+        data:feats.map(([,v],i)=>({value:v,itemStyle:{color:barColor(i),borderRadius:[0,5,5,0]}})),
+        label:{show:true,position:'right',color:T.axis,fontSize:11}}]
+    })
+  }
+  if (_ec.profile) {
+    const gt=Object.entries(profileData.value.group_type||{})
+    const pdata=gt.length
+      ?gt.map(([k,v],i)=>({name:groupTypeLabel[k]||k,value:v,itemStyle:{color:barColor(i)}}))
+      :[{name:'暂无数据',value:1,itemStyle:{color:dark?'#2A2A48':'#e5e7eb'}}]
+    _ec.profile.setOption({
+      tooltip:{trigger:'item',formatter:gt.length?'{b}: {c} ({d}%)':'{b}',backgroundColor:T.tipBg,borderColor:T.tipBd,textStyle:{color:T.tipTx}},
+      legend:{orient:'horizontal',bottom:0,left:'center',icon:'circle',
+              itemWidth:8,itemHeight:8,itemGap:8,type:'scroll',pageIconSize:10,
+              textStyle:{color:T.axis,fontSize:11}},
+      series:[{type:'pie',radius:['46%','68%'],center:['50%','42%'],data:pdata,
+               itemStyle:{borderColor:T.ring,borderWidth:2,borderRadius:5},
+               label:{show:gt.length>1,position:'outside',fontSize:11,color:T.tipTx,formatter:'{b}\n{d}%'},
+               labelLine:{show:gt.length>1,length:6,length2:4},
+               emphasis:{scale:true,scaleSize:5}}]
+    })
+  }
+}
+
+const dashLoaded     = ref(false)
+const dashError      = ref(false)
+const lastUpdateTime = ref(new Date().toLocaleTimeString('zh-CN'))
+const dashClock = ref('')
+const dashDate  = ref('')
+function _updateClock() {
+  const n = new Date()
+  const hh = String(n.getHours()).padStart(2,'0')
+  const mm = String(n.getMinutes()).padStart(2,'0')
+  const ss = String(n.getSeconds()).padStart(2,'0')
+  dashClock.value = hh + ':' + mm + ':' + ss
+  dashDate.value  = n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0')
+}
+_updateClock()
+const sidebarDark = ref(document.documentElement.classList.contains('admin-dark'))
+function toggleTheme() {
+  const next = document.documentElement.classList.contains('admin-dark') ? 'light' : 'dark'
+  localStorage.setItem('admin-theme', next)
+  document.documentElement.classList.toggle('admin-dark', next === 'dark')
+  sidebarDark.value = next === 'dark'
+  window.dispatchEvent(new Event('admin-theme-change'))
+}
+const ranges = [{ val:'today', label:'今日' }, { val:'week', label:'本周' }, { val:'month', label:'本月' }]
+
+const kpiList = ref([
+  { icon:Users,         label:'服务游客人次', value:'--',   trend:0,   color:'#2D7A4F' },
+  { icon:MessageSquare, label:'对话轮次',     value:'--',   trend:0,   color:'#004098' },
+  { icon:Star,          label:'平均满意度',   value:'--',   trend:0,   color:'#B45309' },
+  { icon:Clock,         label:'平均停留时长', value:'--',   trend:0,   color:'#1B4D8E' },
+  { icon:Sparkles,      label:'推荐曝光',     value:'--',   trend:0,   color:'#7C3AED' },
+  { icon:TrendingUp,    label:'推荐点击率',   value:'--',   trend:0,   color:'#7C3AED' },
+])
+
+const trendData  = ref([])
+const maxTrend = computed(() => Math.max(...trendData.value.map(d => d.count), 1))
+
+const hotQAList = ref([])
+
+const avgSatisfaction = ref(0)
+const starDist = ref({ 5:0, 4:0, 3:0, 2:0, 1:0 })
+function starColor(s) { return { 5:'#2D7A4F', 4:'#52A875', 3:'#004098', 2:'#B45309', 1:'#BE3535' }[s] }
+
+const spotAttention = ref([])
+const profileData   = ref({ group_type:{}, lang:{}, interests:{} })
+const featureData   = ref({ feature_open:{}, avg_rating:null, active_sessions:0 })
+
+const groupTypeLabel = { adult:'通用成人', family_kids:'亲子家庭', senior:'老年长辈', couple:'情侣出游' }
+const featureLabel   = { tour:'路线讲解', voice:'语音', photo:'拍照', gps:'导航', facility:'设施', trace:'游记', postcard:'明信片', avatar:'形象切换', chat:'对话咨询' }
+
+function getScenicId() {
+  return authStore.user?.scenic_spot_id || 'lingshan'
+}
+
+const DAY_MAP = ['日','一','二','三','四','五','六']
+
+const safeFetch = (url, ms = 10000) => {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), ms)
+  return fetch(url, { signal: ctrl.signal })
+    .then(r => r.ok ? r.json() : {})
+    .catch(() => ({}))
+    .finally(() => clearTimeout(t))
+}
+
+async function loadDashboard() {
+  dashLoading.value = true
+  dashError.value = false
+  const sid = getScenicId()
+  try {
+    const [overview, dash, topics, sentTrend, crowd, profile, features, reco] = await Promise.all([
+      safeFetch(`${ANALYTICS_BASE}/analytics/bi/overview?scenic_id=${sid}`),
+      safeFetch(`${ANALYTICS_BASE}/analytics/dashboard?scenic_id=${sid}&days=7`),
+      safeFetch(`${ANALYTICS_BASE}/analytics/topic-intents?scenic_id=${sid}&days=30&limit=8`),
+      safeFetch(`${ANALYTICS_BASE}/analytics/sentiment-trend?scenic_id=${sid}`),
+      safeFetch(`${ANALYTICS_BASE}/analytics/crowd?scenic_id=${sid}`),
+      safeFetch(`${ANALYTICS_BASE}/analytics/profile?scenic_id=${sid}&days=7`),
+      safeFetch(`${ANALYTICS_BASE}/analytics/feature-usage?scenic_id=${sid}&days=7`),
+      safeFetch(`${ANALYTICS_BASE}/analytics/reco-performance?scenic_id=${sid}&days=7`),
+    ])
+
+    // KPI
+    kpiList.value[0].value = overview.visitors?.toLocaleString() ?? '--'
+    kpiList.value[1].value = dash.total_conversations?.toLocaleString() ?? '--'
+    const sat = overview.avg_satisfaction ?? sentTrend?.overall_satisfaction ?? 0
+    kpiList.value[2].value = sat ? sat.toFixed(1) + '分' : '--'
+    kpiList.value[3].value = overview.avg_stay_hours ? overview.avg_stay_hours.toFixed(1) + 'h' : '--'
+    kpiList.value[4].value = (reco.impressions ?? 0).toLocaleString()
+    kpiList.value[5].value = reco.ctr != null ? Math.round(reco.ctr * 100) + '%' : '--'
+
+    // 较昨日：从 daily_stats 中取今日/昨日数据算涨跌幅
+    if (Array.isArray(dash.daily_stats)) {
+      const todayKey = new Date().toLocaleDateString('sv')
+      const yestKey  = new Date(Date.now() - 86400000).toLocaleDateString('sv')
+      const todayD = dash.daily_stats.find(d => d.date?.slice(0,10) === todayKey)
+      const yestD  = dash.daily_stats.find(d => d.date?.slice(0,10) === yestKey)
+      const pct = (cur, prev) => prev > 0 ? Math.round((cur - prev) / prev * 100) : null
+      if (todayD && yestD) {
+        kpiList.value[0].trend = pct(todayD.sessions      ?? 0, yestD.sessions      ?? 0)
+        kpiList.value[1].trend = pct(todayD.conversations ?? 0, yestD.conversations ?? 0)
+      }
+    }
+    // 满意度昨日对比：sentTrend.trend 最近两天
+    if (Array.isArray(sentTrend?.trend) && sentTrend.trend.length >= 2) {
+      const sorted = [...sentTrend.trend].sort((a,b) => new Date(a.date) - new Date(b.date))
+      const last = sorted.at(-1), prev = sorted.at(-2)
+      if (prev?.happy_ratio && last?.happy_ratio)
+        kpiList.value[2].trend = Math.round((last.happy_ratio - prev.happy_ratio) / prev.happy_ratio * 100)
+    }
+
+    // 趋势图（近7日）— 补全缺失天，保证连续7天
+    {
+      const dataMap = {}
+      if (Array.isArray(dash.daily_stats)) {
+        for (const d of dash.daily_stats) {
+          const key = d.date?.slice(0, 10)
+          if (key) dataMap[key] = d.conversations ?? d.sessions ?? 0
+        }
+      }
+      const today = new Date()
+      trendData.value = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date(today)
+        date.setDate(today.getDate() - 6 + i)
+        const key = date.toLocaleDateString('sv') // YYYY-MM-DD in local tz
+        return { day: '周' + DAY_MAP[date.getDay()], count: dataMap[key] ?? 0 }
+      })
+    }
+
+    // 话题意图（topic-intents 返回 [{intent, count}]）
+    if (Array.isArray(topics.topics) && topics.topics.length) {
+      hotQAList.value = topics.topics.map(q => ({
+        question: typeof q === 'string' ? q : (q.intent || q.question || q),
+        count:    typeof q === 'object' ? (q.count ?? 1) : 1,
+      }))
+    }
+
+    // 客群画像
+    if (profile.group_type) profileData.value = profile
+
+    // 功能使用
+    if (features.feature_open) featureData.value = features
+
+    // 满意度
+    avgSatisfaction.value = sat ? parseFloat(sat.toFixed(1)) : 0
+    if (Array.isArray(sentTrend?.trend) && sentTrend.trend.length) {
+      const happyRatios = sentTrend.trend.map(t => t.happy_ratio ?? 0)
+      const avgHappy = happyRatios.reduce((a, b) => a + b, 0) / happyRatios.length
+      starDist.value = {
+        5: Math.round(avgHappy * 100),
+        4: Math.round((1 - avgHappy) * 60),
+        3: Math.round((1 - avgHappy) * 25),
+        2: Math.round((1 - avgHappy) * 10),
+        1: Math.round((1 - avgHappy) * 5),
+      }
+    }
+
+    // 景点关注度
+    if (Array.isArray(crowd.attractions) && crowd.attractions.length) {
+      const total = crowd.attractions.reduce((s, a) => s + (a.crowd_index ?? 0), 0) || 1
+      spotAttention.value = crowd.attractions.slice(0, 6).map(a => ({
+        name: a.attraction,
+        pct:  Math.round((a.crowd_index ?? 0) / total * 100),
+      }))
+    }
+
+    lastUpdateTime.value = new Date().toLocaleTimeString('zh-CN')
+    if (kpiList.value.every(k => k.value === '--')) dashError.value = true
+    else {
+      dashLoaded.value = true
+      await nextTick()
+      _ecUpdate()
+      if (!reportLoaded.value) loadReport()  // 大屏加载完后台预取报告
+    }
+  } catch {
+    dashError.value = true
+  } finally {
+    dashLoading.value = false
+  }
+}
+
+async function refreshDashboard() {
+  dashLoaded.value = false
+  await loadDashboard()
+  ElMessage.success('数据已刷新')
+}
+
+// ── 感受度报告 ─────────────────────────────────
+const reportLoading = ref(false)
+const reportError   = ref(false)
+const reportLoaded  = ref(false)
+const reportSummary = ref([
+  { val:'--', label:'正面情感占比', color:'var(--c-green)' },
+  { val:'--', label:'中性情感占比', color:'var(--c-amber)' },
+  { val:'--', label:'负面情感占比', color:'var(--c-red)' },
+  { val:'--', label:'热门话题数',   color:'var(--c-blue)' },
+])
+const emotionDist      = ref([])
+const emotionTrendData = ref([])
+const concernTags      = ref([])
+const topConcerns      = ref([])
+const serviceSuggestions = ref([])
+
+const TAG_COLORS      = ['#004098','#2D7A4F','#1A5BAE','#B45309','#BE3535','#6B7280','#004098','#2D7A4F','#1A5BAE','#B45309']
+const EMOTION_LABEL   = { happy:'开心', excited:'兴奋', calm:'平静', curious:'好奇', sad:'难过', angry:'不满', neutral:'中性', disgust:'反感', fear:'担忧' }
+const EMOTION_COLOR   = { happy:'#2D7A4F', excited:'#004098', calm:'#6B7280', curious:'#1A5BAE', sad:'#BE3535', angry:'#BE3535', neutral:'#6B7280', disgust:'#BE3535', fear:'#B45309' }
+const NEG_EMOTIONS    = new Set(['sad','angry','disgust','fear'])
+const EMOTION_SENTIMENT = { happy:'positive', excited:'positive', calm:'neutral', curious:'neutral', neutral:'neutral', sad:'negative', angry:'negative', disgust:'negative', fear:'negative' }
+
+const dialogueSamples = ref([])
+
+function fmtDialogueTime(createdAt) {
+  if (!createdAt) return ''
+  const d = new Date(createdAt.replace(' ', 'T'))
+  const now = new Date()
+  const hm = d.toTimeString().slice(0, 5)
+  return d.toDateString() === now.toDateString() ? `今日 ${hm}` : `${createdAt.slice(5, 10)} ${hm}`
+}
+
+async function loadReport() {
+  reportLoading.value = true
+  reportError.value = false
+  const sid = getScenicId()
+  try {
+    const [sentTrend, topics, gaps, convs] = await Promise.all([
+      safeFetch(`${ANALYTICS_BASE}/analytics/sentiment-trend?scenic_id=${sid}`),
+      safeFetch(`${ANALYTICS_BASE}/analytics/topic-intents?scenic_id=${sid}&days=30&limit=8`),
+      safeFetch(`${ANALYTICS_BASE}/analytics/knowledge-gaps?scenic_id=${sid}`),
+      safeFetch(`${ANALYTICS_BASE}/analytics/conversations?scenic_id=${sid}&limit=10`),
+    ])
+
+    const trend = (sentTrend || {}).trend || []
+
+    // 聚合所有天的 emotion_counts
+    const totalEmotions = {}
+    let totalCount = 0
+    for (const d of trend) {
+      for (const [k, v] of Object.entries(d.emotion_counts || {})) {
+        totalEmotions[k] = (totalEmotions[k] || 0) + v
+        totalCount += v
+      }
+    }
+
+    // 整体正/中/负占比
+    const avgHappy = trend.length
+      ? trend.reduce((s, d) => s + (d.happy_ratio || 0), 0) / trend.length
+      : (sentTrend?.overall_satisfaction || 0)
+    const posPct = Math.round(avgHappy * 100)
+    const negRaw = totalCount
+      ? Object.entries(totalEmotions).filter(([k]) => NEG_EMOTIONS.has(k)).reduce((s, [, v]) => s + v, 0) / totalCount
+      : Math.max(0, (1 - avgHappy) * 0.25)
+    const negPct = Math.round(negRaw * 100)
+    const neuPct = Math.max(0, 100 - posPct - negPct)
+
+    reportSummary.value = [
+      { val: posPct + '%', label:'正面情感占比', color:'var(--c-green)' },
+      { val: neuPct + '%', label:'中性情感占比', color:'var(--c-amber)' },
+      { val: negPct + '%', label:'负面情感占比', color:'var(--c-red)' },
+      { val: (topics?.topics || []).length + '个', label:'热门话题数', color:'var(--c-blue)' },
+    ]
+
+    // 情感分布
+    emotionDist.value = totalCount > 0
+      ? Object.entries(totalEmotions)
+          .map(([k, v]) => ({ label: EMOTION_LABEL[k] || k, pct: Math.round(v / totalCount * 100), color: EMOTION_COLOR[k] || '#6B7280' }))
+          .sort((a, b) => b.pct - a.pct)
+      : [
+          { label:'积极', pct: posPct, color:'#2D7A4F' },
+          { label:'中性', pct: neuPct, color:'#6B7280' },
+          { label:'消极', pct: negPct, color:'#BE3535' },
+        ]
+
+    // 近7日趋势
+    emotionTrendData.value = [...trend].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-7).map(d => {
+      const pos = Math.round((d.happy_ratio || 0) * 100)
+      const negRatioDay = d.total
+        ? Object.entries(d.emotion_counts || {}).filter(([k]) => NEG_EMOTIONS.has(k)).reduce((s, [, v]) => s + v, 0) / d.total
+        : 0
+      const neg = Math.round(negRatioDay * 100)
+      return { day: '周' + DAY_MAP[new Date(d.date).getDay()], positive: pos, neutral: Math.max(0, 100 - pos - neg), negative: neg }
+    })
+
+    // 热门话题标签云
+    const rawTopics = (topics || {}).topics || []
+    const topicList = rawTopics.map(t => (typeof t === 'string' ? t : t.intent))
+    const maxCount  = Math.max(...rawTopics.map(t => (typeof t === 'object' ? t.count : 1) || 0), 1)
+    const step = topicList.length > 1 ? 0.7 / (topicList.length - 1) : 0
+    concernTags.value = topicList.map((tag, i) => ({
+      tag, weight: Math.max(0.3, 1 - i * step), color: TAG_COLORS[i % TAG_COLORS.length],
+    }))
+    topConcerns.value = rawTopics.slice(0, 5).map(t => ({
+      name: typeof t === 'string' ? t : t.intent,
+      pct: Math.round(((typeof t === 'object' ? t.count : 1) || 0) / maxCount * 100),
+    }))
+
+    // 服务优化建议
+    const gapItems = (gaps || {}).gaps || []
+    const sugs = gapItems.map(g => ({
+      priority: (g.frequency || 0) > 5 ? 'high' : (g.frequency || 0) > 2 ? 'mid' : 'low',
+      title: `补充"${g.question}"相关知识`,
+      desc: `该问题被提问 ${g.frequency} 次但未得到满意回答，建议补充知识库`,
+      impact: Math.min(10, g.frequency || 1),
+    }))
+    if ((gaps?.unanswered_rate || 0) > 0.1) {
+      sugs.unshift({ priority:'high', title:'提升知识库覆盖率', desc:`当前未解答率 ${Math.round((gaps?.unanswered_rate || 0) * 100)}%，建议补充相关文档`, impact: Math.round((gaps.unanswered_rate || 0) * 10) })
+    }
+    if (sugs.length === 0) {
+      sugs.push(
+        { priority:'mid', title: rawTopics[0] ? `完善"${typeof rawTopics[0]==='string'?rawTopics[0]:rawTopics[0].intent}"相关内容` : '持续更新景区知识库', desc:'该话题为当前热门话题，建议确保知识库内容详尽', impact: 5 },
+        { priority:'low', title:'定期更新景区动态', desc:'保持知识库内容时效性，确保游客获取最新信息', impact: 3 },
+      )
+    }
+    serviceSuggestions.value = sugs
+
+    // 典型对话摘录
+    const convItems = (convs || {}).items || []
+    dialogueSamples.value = convItems.map(c => ({
+      time: fmtDialogueTime(c.created_at),
+      sentiment: EMOTION_SENTIMENT[c.emotion] || 'neutral',
+      question: c.user_message,
+      answer: c.ai_reply,
+    }))
+
+    if (reportSummary.value.every(s => s.val === '--')) reportError.value = true
+    else reportLoaded.value = true
+
+  } catch (e) {
+    console.error('报告数据加载失败', e)
+    reportError.value = true
+  } finally {
+    reportLoading.value = false
+  }
+}
+
+onMounted(() => {
+  setInterval(_updateClock, 1000)
+  loadKnowledgeDocs()
+  loadFaq()
+  loadText()
+if (authStore.user?.scenic_spot_id && !sceneStore.scenicName) {
+    const spot = sceneStore.scenicSpots.find(s => s.id === authStore.user.scenic_spot_id)
+    if (spot) sceneStore.selectSpot(spot)
+  }
+  if (activeTab.value === 'dashboard') loadDashboard()
+  else if (activeTab.value === 'report') loadReport()
+  else setTimeout(() => { if (!reportLoaded.value) loadReport() }, 3000)
+  if (activeTab.value === 'avatar') {
+    loadAvatarTab().then(() => nextTick()).then(() => startPreview())
+  }
+  // 浅/深模式切换时，echarts 配置随主题变化，需重绘
+  window.addEventListener('admin-theme-change', _onThemeChange)
+})
+
+function _onThemeChange() { nextTick(() => _ecUpdate()) }
+
+onUnmounted(() => { destroyPreview(); window.removeEventListener('admin-theme-change', _onThemeChange) })
+
+async function refreshReport() {
+  reportLoaded.value = false
+  await loadReport()
+  ElMessage.success('数据已刷新')
+}
+
+// ── AI 分析助手 ─────────────────────────────────
+const aiPanelOpen  = ref(true)
+const aiMessages   = ref([])
+const aiInput      = ref('')
+const aiLoading    = ref(false)
+const aiChatEl     = ref(null)
+const aiTextareaEl = ref(null)
+
+const aiQuickQuestions = ['今日数据摘要', '游客负面情感来源', '知识库优化建议', '本周运营趋势']
+
+function scrollAiToBottom() {
+  nextTick(() => { if (aiChatEl.value) aiChatEl.value.scrollTop = aiChatEl.value.scrollHeight })
+}
+
+function autoResizeTextarea(e) {
+  const el = e.target
+  el.style.height = 'auto'
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+}
+
+function sendQuickQuestion(q) { aiInput.value = q; sendAiMessage() }
+
+async function sendAiMessage() {
+  const text = aiInput.value.trim()
+  if (!text || aiLoading.value) return
+
+  const history = aiMessages.value
+    .filter(m => m.content && !m.loading)
+    .map(m => ({ role: m.role, content: m.content }))
+
+  aiMessages.value.push({ role: 'user', content: text, id: Date.now() })
+  aiInput.value = ''
+  if (aiTextareaEl.value) aiTextareaEl.value.style.height = 'auto'
+  aiLoading.value = true
+  aiMessages.value.push({ role: 'assistant', content: '', id: Date.now() + 1, loading: true })
+  scrollAiToBottom()
+
+  try {
+    const res = await fetch('/api/admin/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, history, scenic_id: getScenicId() })
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    const lastMsg = aiMessages.value[aiMessages.value.length - 1]
+    lastMsg.loading = false
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop()
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        const s = line.slice(6)
+        if (s === '[DONE]') break
+        try {
+          const d = JSON.parse(s)
+          if (d.text)  { lastMsg.content += d.text; scrollAiToBottom() }
+          if (d.error) { lastMsg.content = `错误: ${d.error}`; lastMsg.error = true }
+        } catch {}
+      }
+    }
+  } catch (e) {
+    const lastMsg = aiMessages.value[aiMessages.value.length - 1]
+    lastMsg.content = '请求失败，请检查后端服务与 DashScope API Key 配置'
+    lastMsg.loading = false
+    lastMsg.error = true
+  } finally {
+    aiLoading.value = false
+    scrollAiToBottom()
+  }
+}
+</script>
+
+<style scoped lang="scss">
+/* ── 整体布局 ─────────────────────────────────── */
+.admin-layout {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--c-paper);
+}
+
+/* ── 侧边栏 ─────────────────────────────────── */
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: #004098;
+  border-right: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+
+.sidebar-nav {
+  flex: 1;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255,255,255,0.65);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+
+  &:hover {
+    background: rgba(255,255,255,0.10); color: rgba(255,255,255,0.95);
+    svg { transform: translateX(1px); }
+  }
+  svg { transition: transform 0.15s; }
+  &.active {
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    font-weight: 600;
+    border-color: rgba(255,255,255,0.28);
+    svg { stroke: #97CBE0; }
+  }
+}
+
+.sidebar-footer {
+  padding: 12px 14px;
+  border-top: 1px solid rgba(255,255,255,0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scenic-name-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255,255,255,0.45);
+
+  .name-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 12px;
+    color: rgba(255,255,255,0.75);
+    font-family: var(--font-sans);
+    outline: none;
+    padding: 0;
+    &::placeholder { color: rgba(255,255,255,0.35); }
+    &:focus { color: #fff; }
+  }
+}
+
+.account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.account-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.65);
+  svg { color: rgba(255,255,255,0.40); }
+}
+
+.logout-btn {
+  width: 26px; height: 26px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255,255,255,0.18);
+  background: transparent;
+  color: rgba(255,255,255,0.50);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s;
+  &:hover { border-color: rgba(255,128,128,0.5); color: #FF8080; background: rgba(190,53,53,0.20); }
+}
+
+/* ── 主内容 ─────────────────────────────────── */
+.admin-main {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--c-paper);
+}
+
+.tab-content {
+  padding: 32px 36px;
+  max-width: 1240px;
+  margin: 0 auto;
+  animation: tab-in 0.18s ease-out;
+}
+
+.page-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+
+  h2 {
+    font-family: var(--font-serif);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--c-ink);
+    letter-spacing: -0.01em;
+    position: relative;
+    padding-bottom: 10px;
+
+    &::after {
+      content: '';
+      position: absolute;
+      left: 0; bottom: 0;
+      width: 28px; height: 2px;
+      background: var(--c-gold);
+      border-radius: 1px;
+    }
+  }
+
+  .page-sub {
+    font-size: 12px;
+    color: var(--c-ink-4);
+  }
+
+  .header-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+}
+
+/* ── 通用组件 ─────────────────────────────────── */
+.card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  box-shadow: var(--shadow-sm);
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--c-ink);
+  margin-bottom: 18px;
+  svg { color: var(--c-ink-3); flex-shrink: 0; }
+}
+
+.card-tag {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--c-gold);
+  background: var(--c-gold-bg);
+  border: 1px solid var(--c-gold-bdr);
+  border-radius: 4px;
+  padding: 1px 7px;
+  line-height: 18px;
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.col-left, .col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.mb16 { margin-bottom: 16px; }
+.mb24 { margin-bottom: 24px; }
+.mt12 { margin-top: 12px; }
+.mt16 { margin-top: 16px; }
+.ml-auto { margin-left: auto; }
+
+.primary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--c-gold);
+  background: var(--c-gold);
+  color: #fff;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover  { background: var(--c-gold-2); border-color: var(--c-gold-2); }
+  &:active { transform: translateY(1px); box-shadow: inset 0 1px 3px rgba(0,0,0,0.12); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+  &.full-btn { width: 100%; justify-content: center; }
+}
+
+.ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--c-border);
+  background: var(--c-surface);
+  color: var(--c-ink-2);
+  font-size: 12px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover  { border-color: var(--c-border-2); background: var(--c-paper); }
+  &:active { transform: translateY(1px); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+  &.sm { padding: 4px 9px; font-size: 11px; }
+}
+
+.link-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 12px; color: var(--c-blue); padding: 0 6px;
+  font-family: var(--font-sans); white-space: nowrap;
+  transition: color 0.15s;
+  &:hover  { color: var(--c-blue-2); }
+  &:active { opacity: 0.7; }
+  &.danger  { color: var(--c-red);   &:hover { color: #c83030; } }
+  &.rebuild { color: var(--c-amber); &:hover { color: #9a6a20; } }
+  &.reindex { color: var(--c-blue);  &:hover { color: var(--c-blue-2); } }
+}
+
+/* ── 形象管理 ─────────────────────────────────── */
+.avatar-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.avatar-col-config {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.avatar-col-preview {
+  display: flex;
+  flex-direction: column;
+}
+
+.avatar-preview-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  .avatar-preview-box { flex: 1; min-height: 360px; margin-bottom: 0; }
+}
+
+
+.progress-wrap {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  span { font-size: 11px; color: var(--c-ink-4); }
+}
+
+.progress-bar {
+  height: 3px;
+  background: var(--c-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--c-gold);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.avatar-preview-box {
+  position: relative;
+  height: 340px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--c-border);
+  margin-bottom: 12px;
+
+  .preview-img { width:100%; height:100%; object-fit:cover; object-position:top; }
+
+  .preview-empty {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    color: rgba(255,255,255,0.45);
+    svg { color: rgba(255,255,255,0.22); }
+    p { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.55); }
+    .preview-hint { font-size: 11px; color: rgba(255,255,255,0.32); line-height: 1.4; text-align: center; }
+  }
+
+  .preview-tag {
+    position: absolute; bottom:10px; left:10px;
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; background: rgba(255,255,255,0.9);
+    border: 1px solid var(--c-gold-bdr); color: var(--c-gold);
+    border-radius: var(--radius-sm); padding: 3px 8px;
+    svg { color: var(--c-green); }
+  }
+}
+
+.preview-actions {
+  display: flex; gap: 8px; justify-content: flex-end;
+}
+
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 24px; color: var(--c-ink-4);
+  svg { color: var(--c-border-2); }
+  p { font-size: 12px; }
+}
+
+/* ── 知识库 ─────────────────────────────────── */
+.upload-zone {
+  padding: 32px 20px; text-align: center;
+  .upload-ico { color: var(--c-gold); margin-bottom: 10px; }
+  .upload-main { font-size: 13px; color: var(--c-ink-2); em { color: var(--c-gold); font-style: normal; } }
+  .upload-hint { font-size: 11px; color: var(--c-ink-4); margin-top: 6px; }
+}
+
+.search-wrap {
+  display: flex; align-items: center; gap: 6px;
+  border: 1px solid var(--c-border); border-radius: var(--radius-sm);
+  padding: 4px 10px; background: var(--c-paper);
+  .search-ico { color: var(--c-ink-4); flex-shrink:0; }
+  .search-input { border:none; background:transparent; outline:none; font-size:12px; color:var(--c-ink); font-family:var(--font-sans); width:160px; &::placeholder { color:var(--c-ink-4); } }
+}
+
+.doc-cell {
+  display: flex; align-items: center; gap: 7px;
+  .doc-type {
+    font-size:9px; font-weight:700; padding:1px 5px; border-radius:var(--radius-xs);
+    &.pdf  { background:rgba(190,53,53,0.1); color:var(--c-red); }
+    &.docx { background:rgba(27,77,142,0.1); color:var(--c-blue); }
+    &.txt  { background:var(--c-paper);      color:var(--c-ink-4); border:1px solid var(--c-border); }
+    &.md   { background:rgba(45,122,79,0.1); color:var(--c-green); }
+  }
+}
+
+.status-pill {
+  font-size: 11px; padding: 2px 8px; border-radius: 99px;
+  &.green  { background:var(--c-green-bg); color:var(--c-green); }
+  &.amber  { background:var(--c-amber-bg); color:var(--c-amber); }
+  &.red    { background:var(--c-red-bg);   color:var(--c-red); }
+}
+
+.kb-summary {
+  margin-top: 10px; font-size: 11px; color: var(--c-ink-4);
+  padding-top: 10px; border-top: 1px solid var(--c-border);
+}
+
+/* el-table 样式优化 */
+:deep(.el-table) {
+  --el-table-border-color: transparent;
+  --el-table-header-bg-color: var(--c-paper);
+  --el-table-row-hover-bg-color: var(--c-gold-bg);
+
+  &::before { display: none; }                          /* 去掉底部多余线 */
+
+  .el-table__header-wrapper th {
+    border-bottom: 1px solid var(--c-border) !important;
+    font-size: 11px;
+    color: var(--c-ink-4);
+    font-weight: 500;
+    padding: 7px 0;
+  }
+
+  .el-table__row td {
+    border-bottom: 1px solid var(--c-border) !important;
+    padding: 10px 0;
+  }
+
+  /* 最后一行不需要底线 */
+  .el-table__row:last-child td {
+    border-bottom: none !important;
+  }
+
+  .el-table__body-wrapper {
+    .el-scrollbar__bar.is-horizontal { bottom: 0; }
+    .el-scrollbar__wrap { padding-bottom: 6px; }
+  }
+}
+
+.ops-cell {
+  display: flex; align-items: center; gap: 0; white-space: nowrap; flex-wrap: nowrap;
+}
+
+.ops-sep {
+  display: inline-block; width: 1px; height: 10px;
+  background: var(--c-border-2); margin: 0 2px; flex-shrink: 0;
+}
+
+.form-grid { display: flex; flex-direction: column; gap: 12px; }
+.form-row {
+  display: flex; align-items: center; gap: 12px;
+  label { font-size: 12px; color: var(--c-ink-3); width: 80px; flex-shrink:0; }
+  .threshold-val { font-size: 12px; color: var(--c-ink-3); min-width: 28px; }
+}
+
+/* ── 知识库子 Tab ──────────────────────────────── */
+.kb-nav {
+  display: flex; gap: 4px;
+  .kb-nav-btn {
+    display: flex; align-items: center; gap: 5px;
+    padding: 6px 14px; border-radius: var(--radius-sm); border: 1px solid var(--c-border);
+    font-size: 12px; color: var(--c-ink-3); background: var(--c-surface); cursor: pointer;
+    transition: all .15s; font-family: var(--font-sans);
+    &:hover:not(.active) { border-color: var(--c-gold); color: var(--c-gold-dark); }
+    &:active { transform: translateY(1px); }
+    &.active { background: var(--c-gold-bg); border-color: var(--c-gold); color: var(--c-gold); font-weight: 500; }
+  }
+}
+
+.kb-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.kb-toolbar-right { display: flex; align-items: center; gap: 8px; }
+
+.cat-tabs {
+  display: flex; gap: 4px; flex-wrap: wrap;
+  .cat-btn {
+    padding: 3px 10px; border-radius: 20px; border: 1px solid var(--c-border);
+    font-size: 11px; color: var(--c-ink-3); background: transparent; cursor: pointer;
+    transition: all .12s; font-family: var(--font-sans);
+    &.active { background: var(--c-gold-bg); border-color: var(--c-gold); color: var(--c-gold); }
+    &:hover:not(.active) { border-color: var(--c-ink-4); color: var(--c-ink-2); }
+  }
+}
+
+.cat-badge {
+  padding: 1px 7px; border-radius: 20px; font-size: 10px;
+  background: var(--c-gold-bg); color: var(--c-gold); border: 1px solid var(--c-gold);
+}
+
+.edit-form-card { background: var(--c-gold-bg); border-color: var(--c-gold-bdr); }
+
+.edit-form {
+  display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px;
+}
+.edit-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  label { font-size: 12px; color: var(--c-ink-3); width: 36px; flex-shrink: 0; padding-top: 5px; }
+  &.edit-row-grow label { padding-top: 6px; }
+}
+.edit-row-double { display: flex; gap: 12px; align-items: flex-start; }
+.edit-input {
+  flex: 1; height: 30px; padding: 0 10px; font-size: 13px;
+  border: 1px solid var(--c-border); border-radius: var(--radius-sm);
+  background: var(--c-paper); color: var(--c-ink); font-family: var(--font-sans);
+  outline: none; transition: border-color .15s, box-shadow .15s;
+  &:focus {
+    border-color: var(--c-gold);
+    box-shadow: 0 0 0 2px rgba(0,64,152,0.14);
+  }
+}
+.edit-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding-top: 10px; border-top: 1px solid var(--c-border);
+}
+
+.faq-list {
+  display: flex; flex-direction: column;
+}
+.faq-item {
+  padding: 12px 0; border-bottom: 1px solid var(--c-border);
+  &.last { border-bottom: none; }
+  &.editing { background: var(--c-paper); border-radius: var(--radius-sm); padding: 12px; margin: 0 -4px; }
+}
+.faq-view { display: flex; flex-direction: column; gap: 4px; }
+.faq-q {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 500; color: var(--c-ink);
+}
+.faq-ico { color: var(--c-gold); flex-shrink: 0; }
+.faq-a { font-size: 12px; color: var(--c-ink-3); line-height: 1.6; padding-left: 18px; }
+.faq-foot {
+  display: flex; align-items: center; gap: 8px; padding-left: 18px; margin-top: 4px;
+}
+.item-date { font-size: 11px; color: var(--c-ink-4); }
+.char-hint { font-size: 11px; color: var(--c-ink-4); }
+.item-ops { margin-left: auto; display: flex; gap: 0; }
+
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 40px 0; color: var(--c-ink-4);
+  p { font-size: 12px; margin: 0; }
+}
+
+.char-count { font-size: 11px; color: var(--c-ink-4); text-align: right; margin-top: 4px; }
+
+/* ── 文本段落 ──────────────────────────────────── */
+.text-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px;
+}
+.text-card { padding: 14px 16px; }
+.text-view-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.text-title { font-size: 14px; font-weight: 500; color: var(--c-ink); flex: 1; min-width: 0; }
+.text-preview {
+  font-size: 12px; color: var(--c-ink-3); line-height: 1.7;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden; margin: 0 0 8px;
+}
+
+/* ── 数据大屏 ─────────────────────────────────── */
+.range-tabs {
+  display: flex; border: 1px solid var(--c-border); border-radius: var(--radius-sm); overflow: hidden;
+  .range-btn {
+    padding: 4px 12px; font-size: 12px; border: none; background: var(--c-surface);
+    color: var(--c-ink-3); cursor: pointer; transition: all .15s; font-family: var(--font-sans);
+    &.active { background: var(--c-gold-bg); color: var(--c-gold); }
+    &:hover:not(.active) { background: var(--c-paper); }
+  }
+}
+
+.update-time { font-size: 11px; color: var(--c-ink-4); }
+
+.kpi-row {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px;
+}
+
+.kpi-card {
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg); padding: 20px;
+  display: flex; flex-direction: column;
+  box-shadow: var(--shadow-sm); transition: all .2s;
+  &:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+}
+
+.kpi-card-top {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+
+  .kpi-label { font-size: 12px; color: var(--c-ink-3); }
+
+  .kpi-icon-wrap {
+    width: 32px; height: 32px; border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+  }
+}
+
+.kpi-card:hover .kpi-icon-wrap { transform: scale(1.12); }
+
+.kpi-value { font-size: 32px; font-weight: 700; font-family: var(--font-serif); line-height: 1; margin-bottom: 8px; }
+
+.kpi-trend {
+  font-size: 11px; display: flex; align-items: center; gap: 3px;
+  &.muted { color: var(--c-ink-4); }
+  &.up   { color: var(--c-green); }
+  &.down { color: var(--c-red); }
+}
+
+.charts-grid {
+  display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px;
+}
+
+.chart-card { height: 290px; display: flex; flex-direction: column; }
+
+.bar-chart {
+  flex: 1; display: flex; align-items: flex-end; gap: 6px; padding-top: 8px;
+  .bar-col {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%;
+    cursor: default;
+    &:hover .bar-fill { opacity: 1; background: var(--c-gold-2); box-shadow: 0 0 8px rgba(0,64,152,0.22); }
+    &:hover .bar-day  { color: var(--c-ink-2); }
+    &:hover .bar-val  { color: var(--c-ink); font-weight: 600; }
+  }
+  .bar-track { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+  .bar-fill {
+    width: 100%; background: var(--c-gold); border-radius: 3px 3px 0 0; min-height: 3px;
+    transition: height .4s, background .15s, opacity .15s, box-shadow .15s;
+    opacity: 0.78;
+    transform-origin: bottom;
+    animation: barGrow 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  }
+  .bar-col:nth-child(1) .bar-fill { animation-delay: 0.04s; }
+  .bar-col:nth-child(2) .bar-fill { animation-delay: 0.08s; }
+  .bar-col:nth-child(3) .bar-fill { animation-delay: 0.12s; }
+  .bar-col:nth-child(4) .bar-fill { animation-delay: 0.16s; }
+  .bar-col:nth-child(5) .bar-fill { animation-delay: 0.20s; }
+  .bar-col:nth-child(6) .bar-fill { animation-delay: 0.24s; }
+  .bar-col:nth-child(7) .bar-fill { animation-delay: 0.28s; }
+  .bar-day  { font-size: 10px; color: var(--c-ink-4); transition: color .15s; }
+  .bar-val  { font-size: 10px; color: var(--c-ink-3); transition: color .15s, font-weight .15s; }
+}
+
+.hot-list {
+  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 7px;
+  .hot-item {
+    display:flex; align-items:center; gap:7px;
+    padding: 3px 4px; border-radius: var(--radius-xs);
+    transition: background 0.15s;
+    cursor: default;
+    &:hover { background: var(--c-paper-2);
+      .hot-q  { color: var(--c-ink); }
+      .hot-fill { filter: brightness(1.18); }
+      .hot-n  { color: var(--c-ink-2); font-weight: 600; }
+    }
+  }
+  .hot-rank { width:18px; height:18px; border-radius:50%; background:var(--c-paper); color:var(--c-ink-4); font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    &.top { background:var(--c-gold-bg); color:var(--c-gold); } }
+  .hot-q   { flex:1; font-size:12px; color:var(--c-ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition: color .15s; }
+  .hot-bar { width:80px; height:5px; border-radius:3px; background:var(--c-border); flex-shrink:0; overflow: hidden; }
+  .hot-fill{
+    height:100%; border-radius:3px; background: var(--c-gold-3);
+    transform-origin: left;
+    animation: barSlide 0.45s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+    transition: filter .15s;
+  }
+  .hot-item:nth-child(1)  .hot-fill { animation-delay: 0.05s; }
+  .hot-item:nth-child(2)  .hot-fill { animation-delay: 0.09s; }
+  .hot-item:nth-child(3)  .hot-fill { animation-delay: 0.13s; }
+  .hot-item:nth-child(4)  .hot-fill { animation-delay: 0.17s; }
+  .hot-item:nth-child(5)  .hot-fill { animation-delay: 0.21s; }
+  .hot-item:nth-child(6)  .hot-fill { animation-delay: 0.25s; }
+  .hot-item:nth-child(7)  .hot-fill { animation-delay: 0.29s; }
+  .hot-item:nth-child(8)  .hot-fill { animation-delay: 0.33s; }
+  .hot-item:nth-child(9)  .hot-fill { animation-delay: 0.37s; }
+  .hot-item:nth-child(10) .hot-fill { animation-delay: 0.41s; }
+  .hot-n   { font-size:10px; color:var(--c-ink-4); width:28px; text-align:right; padding-right:6px; transition: color .15s, font-weight .15s; }
+}
+
+.sat-wrap { display: flex; align-items: flex-start; gap: 24px; flex: 1; }
+.sat-big {
+  .sat-num  { font-size: 44px; font-weight: 700; color: var(--c-ink); font-family: var(--font-serif); }
+  .sat-unit { font-size: 14px; color: var(--c-ink-4); }
+}
+.star-dist { flex: 1; display: flex; flex-direction: column; gap: 7px; justify-content: center;
+  .star-row {
+    display:flex; align-items:center; gap:7px;
+    padding: 3px 4px; border-radius: var(--radius-xs);
+    transition: background 0.15s;
+    cursor: default;
+    &:hover { background: var(--c-paper-2);
+      .star-fill { filter: brightness(1.15); }
+      .star-pct  { color: var(--c-ink-2); font-weight: 600; }
+    }
+    .star-n    { font-size:11px; color:var(--c-ink-4); width:14px; text-align:right; }
+    .star-track{ flex:1; height:6px; border-radius:3px; background:var(--c-border); overflow: hidden; }
+    .star-fill {
+      height:100%; border-radius:3px;
+      transform-origin: left;
+      animation: barSlide 0.45s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+      transition: filter .15s;
+    }
+    .star-pct  { font-size:10px; color:var(--c-ink-4); width:28px; transition: color .15s, font-weight .15s; }
+  }
+  .star-row:nth-child(1) .star-fill { animation-delay: 0.05s; }
+  .star-row:nth-child(2) .star-fill { animation-delay: 0.10s; }
+  .star-row:nth-child(3) .star-fill { animation-delay: 0.15s; }
+  .star-row:nth-child(4) .star-fill { animation-delay: 0.20s; }
+  .star-row:nth-child(5) .star-fill { animation-delay: 0.25s; }
+}
+
+.spot-list { display:flex; flex-direction:column; gap:10px; flex:1; justify-content:center;
+  .spot-item {
+    display:flex; align-items:center; gap:9px;
+    padding: 3px 4px; border-radius: var(--radius-xs);
+    transition: background 0.15s;
+    cursor: default;
+    &:hover { background: var(--c-paper-2);
+      .spot-name { color: var(--c-ink); font-weight: 500; }
+      .spot-fill { filter: brightness(1.15); }
+      .spot-pct  { color: var(--c-ink-2); font-weight: 600; }
+    }
+    .spot-name  { font-size:12px; color:var(--c-ink-2); width:70px; transition: color .15s, font-weight .15s; }
+    .spot-track { flex:1; height:8px; border-radius:4px; background:var(--c-border); overflow: hidden; }
+    .spot-fill  {
+      height:100%; border-radius:4px;
+      transform-origin: left;
+      animation: barSlide 0.45s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+      transition: filter .15s;
+    }
+    .spot-pct   { font-size:11px; color:var(--c-ink-4); width:32px; text-align:right; transition: color .15s, font-weight .15s; }
+  }
+  .spot-item:nth-child(1) .spot-fill { animation-delay: 0.05s; }
+  .spot-item:nth-child(2) .spot-fill { animation-delay: 0.10s; }
+  .spot-item:nth-child(3) .spot-fill { animation-delay: 0.15s; }
+  .spot-item:nth-child(4) .spot-fill { animation-delay: 0.20s; }
+  .spot-item:nth-child(5) .spot-fill { animation-delay: 0.25s; }
+  .spot-item:nth-child(6) .spot-fill { animation-delay: 0.30s; }
+}
+
+/* ── 感受度报告 ─────────────────────────────────── */
+.summary-strip {
+  display: flex;
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg); overflow: hidden;
+  box-shadow: var(--shadow-sm); margin-bottom: 16px;
+}
+.summary-metric {
+  flex: 1; padding: 20px 24px;
+  border-right: 1px solid var(--c-border);
+  display: flex; align-items: center; gap: 16px;
+  &:last-child { border-right: none; }
+  .metric-num   { font-size: 32px; font-weight: 700; font-family: var(--font-serif); line-height: 1; flex-shrink: 0; }
+  .metric-label { font-size: 12px; color: var(--c-ink-3); line-height: 1.5; }
+}
+
+.emotion-dist { display:flex; flex-direction:column; gap:10px;
+  .emo-item { display:flex; flex-direction:column; gap:4px; }
+  .emo-bar-track { height:6px; border-radius:3px; background:var(--c-border); }
+  .emo-bar-fill  { height:100%; border-radius:3px; }
+  .emo-meta { display:flex; justify-content:space-between;
+    .emo-label { font-size:11px; color:var(--c-ink-3); }
+    .emo-pct   { font-size:11px; font-weight:600; }
+  }
+}
+
+.section-divider {
+  font-size: 11px; color: var(--c-ink-4); margin: 16px 0 10px;
+  display: flex; align-items: center; gap: 8px;
+  &::after { content:''; flex:1; height:1px; background:var(--c-border); }
+}
+
+.trend-stacks {
+  display:flex; gap:4px; height:60px; align-items:flex-end;
+  .stack-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px;
+    span { font-size:9px; color:var(--c-ink-4); }
+  }
+  .stack-bar { flex:1; width:100%; display:flex; flex-direction:column; border-radius:3px; overflow:hidden; }
+  .seg { width:100%;
+    &.positive { background: rgba(45,122,79,0.6); }
+    &.neutral  { background: rgba(107,114,128,0.35); }
+    &.negative { background: rgba(190,53,53,0.5); }
+  }
+}
+
+.stack-legend { display:flex; gap:12px; margin-top:6px;
+  .leg { font-size:10px; color:var(--c-ink-4); display:flex; align-items:center; gap:4px;
+    &::before { content:''; width:8px; height:8px; border-radius:2px; }
+    &.pos::before { background:rgba(45,122,79,0.6); }
+    &.neu::before { background:rgba(107,114,128,0.35); }
+    &.neg::before { background:rgba(190,53,53,0.5); }
+  }
+}
+
+.tag-cloud {
+  display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 0 6px; min-height: 80px;
+  .cloud-tag { cursor: default; transition: transform 0.15s; line-height: 1.4;
+    &:hover { transform: scale(1.06); } }
+}
+
+.concern-rows { display:flex; flex-direction:column; gap:8px;
+  .concern-row { display:flex; align-items:center; gap:8px;
+    .c-rank { font-size:12px; font-weight:600; color:var(--c-gold); width:16px; }
+    .c-name { font-size:12px; color:var(--c-ink-2); width:110px; }
+    .c-track{ flex:1; height:5px; border-radius:3px; background:var(--c-border); }
+    .c-fill { height:100%; border-radius:3px; background:var(--c-gold); }
+    .c-pct  { font-size:11px; color:var(--c-ink-4); width:32px; text-align:right; }
+  }
+}
+
+.suggestion-list { display:flex; flex-direction:column; gap:10px;
+  .sug-item {
+    display:flex; align-items:flex-start; gap:12px;
+    padding:12px 14px; border-radius:var(--radius);
+    border: 1px solid var(--c-border); transition: border-color .15s;
+    &:hover { border-color: var(--c-border-2); }
+    &.high { background: var(--c-red-bg);   border-color: rgba(190,53,53,0.22); }
+    &.mid  { background: var(--c-amber-bg); border-color: rgba(180,83,9,0.22); }
+    &.low  { background: var(--c-green-bg); border-color: rgba(45,122,79,0.22); }
+  }
+  .sug-badge { font-size:10px; font-weight:600; padding:2px 7px; border-radius:var(--radius-xs); white-space:nowrap; flex-shrink:0; margin-top:2px; background:var(--c-paper); color:var(--c-ink-3); }
+  &>.sug-item.high .sug-badge { background:var(--c-red-bg); color:var(--c-red); }
+  &>.sug-item.mid  .sug-badge { background:var(--c-amber-bg); color:var(--c-amber); }
+  &>.sug-item.low  .sug-badge { background:var(--c-green-bg); color:var(--c-green); }
+  .sug-body { flex:1; .sug-title { font-size:13px; font-weight:600; margin-bottom:3px; color:var(--c-ink); } .sug-desc { font-size:11px; color:var(--c-ink-3); line-height:1.6; } }
+  .sug-impact { font-size:11px; color:var(--c-green); white-space:nowrap; flex-shrink:0; }
+}
+
+.dialogue-list { display:flex; flex-direction:column; gap:10px;
+  .dialogue-item { padding:12px 14px; border-radius:var(--radius); border:1px solid var(--c-border); background:var(--c-paper); }
+  .dlg-meta { display:flex; align-items:center; gap:8px; margin-bottom:7px;
+    .dlg-time { font-size:11px; color:var(--c-ink-4); }
+  }
+  .sentiment-tag { font-size:10px; padding:1px 7px; border-radius:99px;
+    &.positive { background:var(--c-green-bg); color:var(--c-green); }
+    &.negative { background:var(--c-red-bg); color:var(--c-red); }
+    &.neutral  { background:var(--c-paper-2); color:var(--c-ink-4); border:1px solid var(--c-border); }
+  }
+  .dlg-q { font-size:13px; color:var(--c-ink); margin-bottom:5px; &::before { content:'Q  '; color:var(--c-gold); font-weight:700; } }
+  .dlg-a { font-size:12px; color:var(--c-ink-3); line-height:1.6; &::before { content:'A  '; color:var(--c-ink-4); } }
+}
+
+/* ── 数据大屏错误 ─────────────────────────────────── */
+.dash-error-banner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border-radius: var(--radius);
+  background: var(--c-red-bg); border: 1px solid rgba(190,53,53,0.2);
+  color: var(--c-red); font-size: 12px; margin-bottom: 16px;
+  svg { flex-shrink: 0; }
+}
+
+/* ── 知识库撤销条 ─────────────────────────────────── */
+.undo-toast {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 14px; border-radius: var(--radius-sm);
+  background: var(--c-ink); color: rgba(250,248,244,0.88); font-size: 12px;
+  margin-bottom: 14px;
+}
+
+/* ── 检索配置提示 ─────────────────────────────────── */
+.config-hint {
+  font-size: 11px; color: var(--c-ink-4); line-height: 1.6; margin: 0;
+  padding: 4px 0 2px;
+}
+
+/* ── 工具 ─────────────────────────────────── */
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.status-pill.pulsing { animation: status-pulse 1.8s ease-in-out infinite; }
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes tab-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes barGrow {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+
+@keyframes barSlide {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin,
+  .ai-online-dot,
+  .ai-typing-dots i { animation: none !important; }
+
+  .primary-btn, .ghost-btn, .link-btn, .kb-nav-btn,
+  .nav-item svg, .bar-fill, .bar-day, .bar-val,
+  .kpi-card, .kpi-icon-wrap { transition: none !important; transform: none !important; }
+
+  .ai-bot-icon, .status-pill.pulsing,
+  .ai-msg-row, .tab-content { animation: none !important; }
+
+  .bar-fill, .hot-fill, .star-fill, .spot-fill { animation: none !important; }
+}
+
+/* ── 报告页 loading ─────────────────────────────────── */
+.report-loading {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 60px 0; color: var(--c-ink-4);
+  span { font-size: 13px; }
+}
+
+.chart-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 30px 0; color: var(--c-ink-4); flex: 1; justify-content: center;
+  svg { color: var(--c-border-2); }
+  p { font-size: 12px; }
+}
+.chart-empty-sm { font-size:11px; color:var(--c-ink-4); padding:8px 0; }
+
+.profile-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; flex: 1;
+}
+.profile-section {
+  display: flex; flex-direction: column; gap: 8px;
+  .profile-label { font-size:10px; color:var(--c-ink-3); font-weight:600; text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px; }
+}
+
+.feature-meta {
+  display:flex; gap:16px; margin-bottom:12px;
+  span { font-size:11px; color:var(--c-ink-3); b { color:var(--c-ink); font-size:13px; } }
+}
+
+/* ── AI 分析助手面板 ─────────────────────────────────── */
+.ai-panel {
+  width: 288px;
+  flex-shrink: 0;
+  background: var(--c-surface);
+  border-left: 1px solid var(--c-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.22s ease;
+
+  &.collapsed {
+    width: 40px;
+    .ai-messages, .ai-input-wrap, .ai-header-title, .ai-online-dot, .ai-header-ico { display: none; }
+    .ai-panel-header { padding: 14px 0; justify-content: center; }
+  }
+}
+
+.ai-toggle-btn {
+  width: 24px; height: 24px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent; cursor: pointer;
+  color: var(--c-ink-3); border-radius: var(--radius-sm);
+  transition: all 0.15s;
+  &:hover { color: var(--c-ink); background: var(--c-paper); }
+  svg { transition: transform 0.22s ease; }
+  svg.flipped { transform: rotate(180deg); }
+}
+
+.ai-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 14px 16px 13px;
+  border-bottom: 1px solid var(--c-border);
+  background: linear-gradient(135deg, var(--c-gold-bg) 0%, var(--c-surface) 100%);
+  flex-shrink: 0;
+
+  .ai-header-ico   { color: var(--c-gold); flex-shrink: 0; }
+  .ai-header-title { font-size: 13px; font-weight: 600; color: var(--c-ink); font-family: var(--font-serif); flex: 1; }
+  .ai-online-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--c-green); flex-shrink: 0;
+    box-shadow: 0 0 5px rgba(45,122,79,0.5);
+    animation: pulse-dot 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+.ai-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scroll-behavior: smooth;
+}
+
+.ai-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 5px;
+  padding: 18px 6px 8px;
+
+  .ai-bot-icon {
+    width: 46px; height: 46px;
+    border-radius: 50%;
+    background: var(--c-gold-bg);
+    border: 1px solid var(--c-gold-bdr);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--c-gold);
+    margin-bottom: 6px;
+    animation: bot-float 3.2s ease-in-out infinite;
+  }
+  .ai-welcome-title { font-size: 13px; font-weight: 600; color: var(--c-ink); }
+  .ai-welcome-sub   { font-size: 11px; color: var(--c-ink-4); line-height: 1.65; margin-top: 2px; }
+}
+
+@keyframes bot-float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-5px); }
+}
+
+.ai-quick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 12px;
+  width: 100%;
+
+  .ai-quick-chip {
+    padding: 7px 11px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--c-gold-bdr);
+    background: var(--c-gold-bg);
+    color: var(--c-gold);
+    font-size: 12px;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    transition: all .15s;
+    display: flex; align-items: center; justify-content: space-between;
+
+    &::after {
+      content: '→';
+      font-size: 11px;
+      opacity: 0;
+      transform: translateX(-6px);
+      transition: opacity .15s, transform .15s;
+      flex-shrink: 0;
+    }
+    &:hover {
+      background: var(--c-gold); color: #fff; border-color: var(--c-gold);
+      &::after { opacity: 1; transform: translateX(0); }
+    }
+  }
+}
+
+.ai-msg-row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  animation: msg-in 0.22s cubic-bezier(0.25, 1, 0.5, 1);
+  &.user { flex-direction: row-reverse; }
+
+  .ai-msg-icon {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--c-gold-bg);
+    border: 1px solid var(--c-gold-bdr);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--c-gold);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+}
+
+.ai-bubble {
+  max-width: 86%;
+  padding: 8px 11px;
+  font-size: 12px;
+  line-height: 1.7;
+  word-break: break-word;
+  white-space: pre-wrap;
+
+  &.assistant {
+    background: var(--c-paper);
+    border: 1px solid var(--c-border);
+    color: var(--c-ink-2);
+    border-radius: 2px 12px 12px 12px;
+  }
+  &.user {
+    background: var(--c-gold);
+    color: #fff;
+    border-radius: 12px 2px 12px 12px;
+  }
+  &.error {
+    background: var(--c-red-bg);
+    border-color: rgba(190,53,53,0.2);
+    color: var(--c-red);
+  }
+}
+
+.ai-typing-dots {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 3px 0;
+
+  i {
+    display: block;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--c-ink-4);
+    animation: dot-bounce 1.4s ease-in-out infinite;
+    &:nth-child(2) { animation-delay: .2s; }
+    &:nth-child(3) { animation-delay: .4s; }
+  }
+}
+
+@keyframes dot-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: .4; }
+  30%            { transform: translateY(-5px); opacity: 1; }
+}
+
+.ai-input-wrap {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--c-border);
+  background: var(--c-surface);
+  flex-shrink: 0;
+}
+
+.ai-input {
+  flex: 1;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: 12px;
+  font-family: var(--font-sans);
+  color: var(--c-ink);
+  background: var(--c-paper);
+  outline: none;
+  resize: none;
+  min-height: 34px;
+  max-height: 120px;
+  line-height: 1.5;
+  transition: border-color .15s;
+
+  &::placeholder { color: var(--c-ink-4); }
+  &:focus         { border-color: var(--c-gold); }
+  &:disabled      { opacity: .55; }
+}
+
+.ai-send {
+  width: 34px; height: 34px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--c-border);
+  background: var(--c-paper);
+  color: var(--c-ink-4);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all .15s;
+  flex-shrink: 0;
+
+  &.active                        { background: var(--c-gold); border-color: var(--c-gold); color: #fff; }
+  &:not(:disabled):hover:not(.active) { border-color: var(--c-gold-bdr); color: var(--c-gold); }
+  &:disabled                      { cursor: not-allowed; opacity: .45; }
+}
+
+/* ── 响应式断点 ───────────────────────────────── */
+
+/* ≤900px: 侧边栏收窄为仅图标模式，AI 面板收起 */
+@media (max-width: 900px) {
+  .ai-panel { display: none; }
+  .sidebar {
+    width: 54px;
+    flex-shrink: 0;
+
+    .sidebar-logo span,
+    .sidebar-footer { display: none; }
+  }
+
+  .nav-item {
+    justify-content: center;
+    padding: 10px;
+    gap: 0;
+    span { display: none; }
+  }
+
+  .tab-content {
+    padding: 20px 18px;
+  }
+
+  .two-col,
+  .avatar-layout,
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 触摸设备：放大最小触控区域至 44×44px */
+@media (pointer: coarse) {
+  .link-btn {
+    padding: 6px 10px;
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .ghost-btn.sm {
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+}
+
+/* ══ 顶部导航栏 ══ */
+.top-nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 52px;
+  background: #0d1b2e;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px 0 16px;
+  z-index: 9999;
+  flex-shrink: 0;
+}
+
+.tn-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tn-logo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2.5px;
+  width: 18px;
+  height: 18px;
+}
+
+.tn-dot {
+  border-radius: 50%;
+  width: 7px;
+  height: 7px;
+}
+
+.tn-brand {
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.95);
+  letter-spacing: 0.5px;
+  font-family: var(--font-serif);
+}
+
+.tn-sep {
+  color: rgba(255,255,255,0.3);
+  font-size: 13px;
+  margin: 0 2px;
+}
+
+.tn-scenic {
+  font-size: 13px;
+  color: rgba(255,255,255,0.55);
+  font-weight: 400;
+}
+
+.tn-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tn-lang {
+  display: flex;
+  background: rgba(255,255,255,0.08);
+  border-radius: 7px;
+  padding: 2px;
+  gap: 1px;
+}
+
+.tn-lang-btn {
+  padding: 4px 9px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.5);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all 0.15s;
+
+  &.active {
+    background: rgba(255,255,255,0.95);
+    color: #0B1829;
+    font-weight: 700;
+  }
+
+  &:not(.active):hover {
+    color: rgba(255,255,255,0.85);
+    background: rgba(255,255,255,0.12);
+  }
+}
+
+.tn-gps {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  padding: 4px 10px;
+
+  svg { color: var(--c-gold); }
+}
+
+.tn-clock {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.85);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+  min-width: 36px;
+  text-align: center;
+}
+
+.tn-return-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 13px;
+  border-radius: 7px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.8);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all 0.15s;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.3);
+    color: #fff;
+  }
+}
+
+/* 整体下移 52px 避免被顶部栏遮住 */
+.admin-layout {
+  padding-top: 52px !important;
+}
+
+
+/* ══ ECharts dashboard ══════════════════════════════════════════════ */
+.tab-dashboard-screen {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #060d1f;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  background-image:
+    radial-gradient(ellipse 80% 40% at 50% -5%, rgba(0,80,200,0.22), transparent),
+    radial-gradient(ellipse 50% 35% at 100% 105%, rgba(100,0,200,0.13), transparent),
+    radial-gradient(ellipse 40% 30% at 0% 105%, rgba(0,150,200,0.10), transparent);
+}
+.dsh-hd {
+  height: 56px; flex-shrink: 0;
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; padding: 0 20px;
+  background: rgba(0,8,24,0.85);
+  border-bottom: 1px solid rgba(0,200,255,0.18);
+  position: relative;
+}
+.dsh-hd::after {
+  content: "";
+  position: absolute; bottom: 0; left: 10%; right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,200,255,0.7), transparent);
+}
+.dsh-hd-l { display: flex; align-items: center; gap: 14px; }
+.dsh-scenic { font-size: 12px; color: rgba(0,200,255,0.75); font-weight: 500; }
+.dsh-ranges {
+  display: flex; gap: 1px;
+  background: rgba(0,200,255,0.08);
+  border: 1px solid rgba(0,200,255,0.2);
+  border-radius: 3px; padding: 2px;
+}
+.dsh-rb {
+  padding: 3px 9px; border: none; background: transparent;
+  color: rgba(0,200,255,0.55); font-size: 11px; cursor: pointer;
+  border-radius: 2px; transition: all .12s; font-family: var(--font-sans);
+}
+.dsh-rb.active { background: rgba(0,200,255,0.2); color: #00c8ff; }
+.dsh-rb:hover:not(.active) { color: rgba(0,200,255,0.85); }
+.dsh-hd-c {
+  display: flex; align-items: center; gap: 14px;
+  font-size: 20px; font-weight: 700; color: #e8f4ff;
+  letter-spacing: 0.1em; font-family: var(--font-serif);
+  text-shadow: 0 0 24px rgba(0,200,255,0.55), 0 0 48px rgba(0,120,255,0.3);
+}
+.dsh-deco-line {
+  display: inline-block; width: 36px; height: 2px;
+  background: linear-gradient(90deg, transparent, #00c8ff); border-radius: 1px;
+}
+.dsh-deco-r { background: linear-gradient(90deg, #00c8ff, transparent); }
+.dsh-hd-r { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+.dsh-hdate { font-size: 12px; color: rgba(0,200,255,0.65); }
+.dsh-htime { font-size: 17px; font-weight: 700; color: #00c8ff; font-variant-numeric: tabular-nums; letter-spacing: 0.05em; }
+.dsh-hbtn {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,200,255,0.06); border: 1px solid rgba(0,200,255,0.22);
+  color: rgba(0,200,255,0.65); border-radius: 3px; cursor: pointer; transition: all .12s;
+}
+.dsh-hbtn:hover { background: rgba(0,200,255,0.16); color: #00c8ff; }
+.dsh-hbtn:disabled { opacity: .4; cursor: not-allowed; }
+.dsh-hbtn.dsh-exit:hover { border-color: rgba(251,113,133,0.5); color: #fb7185; background: rgba(251,113,133,0.08); }
+.dsh-error-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 20px; background: rgba(251,113,133,0.1);
+  border-bottom: 1px solid rgba(251,113,133,0.25);
+  font-size: 12px; color: #fb7185; flex-shrink: 0;
+}
+.dsh-error-bar button {
+  margin-left: auto; background: none; border: 1px solid rgba(251,113,133,0.4);
+  color: #fb7185; padding: 2px 10px; border-radius: 3px; cursor: pointer; font-size: 11px;
+}
+.dsh-body {
+  flex: 1;
+  display: grid; grid-template-columns: 260px 1fr 260px;
+  gap: 10px; padding: 10px 14px 10px;
+  overflow: hidden; min-height: 0;
+}
+.dsh-col { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: hidden; }
+.dsh-col-c { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: hidden; }
+.dsh-panel {
+  background: rgba(0,16,48,0.6);
+  border: 1px solid rgba(0,180,255,0.2);
+  border-radius: 3px; padding: 10px 12px;
+  position: relative; flex-shrink: 0;
+  backdrop-filter: blur(6px);
+}
+.dsh-panel::before {
+  content: "";
+  position: absolute; top: -1px; left: -1px;
+  width: 12px; height: 12px;
+  border-top: 2px solid #00c8ff; border-left: 2px solid #00c8ff;
+}
+.dsh-panel::after {
+  content: "";
+  position: absolute; bottom: -1px; right: -1px;
+  width: 12px; height: 12px;
+  border-bottom: 2px solid #00c8ff; border-right: 2px solid #00c8ff;
+}
+.dsh-pf { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.dsh-pm { flex: 0 0 auto; }
+.dsh-phd {
+  font-size: 12px; font-weight: 600; color: #00c8ff;
+  padding-bottom: 8px; margin-bottom: 6px;
+  border-bottom: 1px solid rgba(0,200,255,0.12);
+  display: flex; align-items: center; gap: 7px; flex-shrink: 0;
+}
+.dsh-phd::before {
+  content: "";
+  width: 3px; height: 12px;
+  background: linear-gradient(180deg, #00c8ff, #7c3aed);
+  border-radius: 2px; flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(0,200,255,0.6);
+}
+.dsh-pmeta { font-size: 10px; color: rgba(255,255,255,0.35); margin-left: auto; font-weight: 400; }
+.dsh-sat-n { margin-left: auto; font-size: 18px; font-weight: 700; color: #a78bfa; }
+.dsh-sat-n small { font-size: 11px; color: rgba(255,255,255,0.4); }
+.dsh-ec { width: 100%; }
+.dsh-ec-main { height: 27vh; }
+.dsh-ec-md   { height: 100%; min-height: 120px; }
+.dsh-ec-sm   { height: 100%; min-height: 100px; }
+.dsh-ec-lg   { height: 100%; min-height: 130px; }
+.dsh-pm { height: calc(52% - 8px); }
+.dsh-r2 {
+  flex: 1; display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px; min-height: 0;
+}
+.dsh-r2 .dsh-panel { flex: 1; display: flex; flex-direction: column; }
+.dsh-kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.dsh-kpi {
+  background: rgba(0,30,70,0.6);
+  border: 1px solid rgba(0,180,255,0.12);
+  border-radius: 3px; padding: 8px 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.dsh-kpi-ico { flex-shrink: 0; }
+.dsh-kpi-body { flex: 1; min-width: 0; }
+.dsh-kpi-val { font-size: 16px; font-weight: 700; line-height: 1.2; }
+.dsh-kpi-lbl { font-size: 9px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+.sidebar-theme-row {
+  padding: 8px 8px 4px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin-top: 4px;
+}
+.sidebar-theme-btn {
+  width: 100%; display: flex; align-items: center; gap: 7px;
+  padding: 7px 10px; border-radius: 6px; border: none; cursor: pointer;
+  font-size: 12px; font-family: var(--font-sans);
+  color: var(--c-ink-3); background: transparent;
+  transition: background .12s, color .12s;
+}
+.sidebar-theme-btn:hover { background: var(--c-paper-2); color: var(--c-ink); }
+.sat-score {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 2px 0;
+}
+.sat-num-big {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--c-gold);
+  font-variant-numeric: tabular-nums;
+}
+.sat-unit-sm { font-size: 12px; color: var(--c-ink-4); }
+.feature-meta-sm {
+  font-size: 11px;
+  color: var(--c-ink-4);
+  margin-bottom: 4px;
+}
+.feature-meta-sm b { color: var(--c-ink-2); font-weight: 600; }
+
+/* ── 形象管理·配置台 ── */
+.full-btn { width: 100%; justify-content: center; }
+.mt8 { margin-top: 8px; }
+
+.av-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.av-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.av-card {
+  position: relative; border: 1px solid var(--c-border); border-radius: var(--radius-sm);
+  overflow: hidden; background: rgba(255,255,255,0.03); cursor: pointer; padding: 0;
+  transition: border-color .2s, transform .1s;
+  img { width: 100%; aspect-ratio: 4/5; object-fit: cover; object-position: top; display: block; }
+  .av-name { display: block; font-size: 11px; font-weight: 500; color: var(--c-ink-2);
+    padding: 4px 5px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  &:hover { border-color: var(--c-gold-bdr); }
+  &.sel { border-color: var(--c-gold); box-shadow: 0 0 0 1px var(--c-gold); }
+  &.soon { opacity: .55; cursor: not-allowed; img { filter: grayscale(.4); } }
+  &:active:not(.soon) { transform: scale(.97); }
+  .av-check { position: absolute; top: 4px; right: 4px; color: var(--c-gold);
+    background: rgba(0,0,0,.4); border-radius: 50%; }
+  .av-badge.soon { position: absolute; top: 4px; left: 4px; font-size: 9px;
+    background: rgba(0,0,0,.55); color: rgba(255,255,255,.8); padding: 1px 5px; border-radius: 8px; }
+}
+.av-empty { grid-column: 1/-1; text-align: center; font-size: 12px; color: var(--c-ink-4); padding: 16px 0; }
+
+.av-wardrobe { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.wd-card {
+  flex: 0 0 64px; border: 1px solid var(--c-border); border-radius: var(--radius-sm);
+  overflow: hidden; background: rgba(255,255,255,0.03); cursor: pointer; padding: 0;
+  img { width: 64px; height: 80px; object-fit: cover; object-position: top; display: block; }
+  span { display: block; font-size: 10px; color: var(--c-ink-2); padding: 3px;
+    text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  &.sel { border-color: var(--c-gold); box-shadow: 0 0 0 1px var(--c-gold); }
+}
+
+.av-voices { display: flex; flex-direction: column; gap: 6px; }
+.vc-card {
+  display: flex; align-items: baseline; gap: 8px; text-align: left;
+  border: 1px solid var(--c-border); border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.03); cursor: pointer; padding: 8px 10px;
+  .vc-name { font-size: 13px; font-weight: 600; color: var(--c-ink-2); flex-shrink: 0; }
+  .vc-tone { font-size: 11px; color: var(--c-ink-4); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  &.sel { border-color: var(--c-gold); background: rgba(212,160,80,0.08); }
+}
+
+.av-bgs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.bg-card {
+  border: 1px solid var(--c-border); border-radius: var(--radius-sm); overflow: hidden;
+  background: rgba(255,255,255,0.03); cursor: pointer; padding: 0;
+  img { width: 100%; height: 46px; object-fit: cover; display: block; }
+  .bg-none { height: 46px; display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: var(--c-ink-4); }
+  span { display: block; font-size: 10px; color: var(--c-ink-2); padding: 3px;
+    text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  &.sel { border-color: var(--c-gold); box-shadow: 0 0 0 1px var(--c-gold); }
+}
+
+.preview-video { width: 100%; height: 100%; object-fit: contain; background: #05060a; }
+.preview-applying {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: rgba(0,0,0,.45); color: #fff; font-size: 13px;
+}
+.preview-meta { display: flex; gap: 16px; font-size: 12px; color: var(--c-ink-4); margin-bottom: 4px; }
+
+</style>

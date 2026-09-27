@@ -1,0 +1,215 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+/* 中文统一字体：HarmonyOS Sans SC（华为鸿蒙，免费商用，本地自托管 woff2，已子集化 GB2312 ~930KB/档）。
+   三端（iOS/安卓/桌面）渲染同一份字形，消除系统兜底导致的中文字体不一致。
+   字体栈 Latin 优先（见 --font-sans）：英文/数字仍走 Geist（科技感、数字好看），中文落鸿蒙。
+   unicode-range 限定 CJK 相关码位 → 无中文的视图不会下载、Latin 字符也不会误用鸿蒙字形。
+   font-display: swap → 字体未到位先用系统兜底显示，不阻塞首屏（移动扫码体验）。 */
+@font-face {
+    font-family: 'HarmonyOS Sans SC';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('/fonts/HarmonyOS_Sans_SC_Regular.woff2') format('woff2');
+    unicode-range: U+00B7, U+2000-206F, U+2103, U+2160-217F, U+2460-24FF, U+2E80-2EFF, U+3000-303F, U+3040-30FF, U+31C0-31EF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
+}
+@font-face {
+    font-family: 'HarmonyOS Sans SC';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('/fonts/HarmonyOS_Sans_SC_Medium.woff2') format('woff2');
+    unicode-range: U+00B7, U+2000-206F, U+2103, U+2160-217F, U+2460-24FF, U+2E80-2EFF, U+3000-303F, U+3040-30FF, U+31C0-31EF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
+}
+@font-face {
+    font-family: 'HarmonyOS Sans SC';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('/fonts/HarmonyOS_Sans_SC_Bold.woff2') format('woff2');
+    unicode-range: U+00B7, U+2000-206F, U+2103, U+2160-217F, U+2460-24FF, U+2E80-2EFF, U+3000-303F, U+3040-30FF, U+31C0-31EF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
+}
+
+@theme inline {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Geist Variable', 'HarmonyOS Sans SC', sans-serif;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-sweet-foreground: var(--sweet-foreground);
+    --color-sweet: var(--sweet);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    /* 背景带极淡暖意，避免纯白的冷硬（甜美明快但不发灰） */
+    --background: oklch(0.995 0.004 60);
+    --foreground: oklch(0.23 0.03 274);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.23 0.03 274);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.23 0.03 274);
+    /* 品牌主色：友好靛蓝，略提亮提彩 = 可信 + 活力 */
+    --primary: oklch(0.575 0.2 268);
+    --primary-foreground: oklch(0.99 0.01 268);
+    /* 甜暖点缀色（珊瑚），仅用于喜悦/高光时刻，<10% 面积 */
+    --sweet: oklch(0.74 0.15 28);
+    --sweet-foreground: oklch(0.99 0.01 28);
+    /* 中性层统一向品牌色注入微弱色相，去除"临床灰" */
+    --secondary: oklch(0.965 0.008 274);
+    --secondary-foreground: oklch(0.26 0.02 274);
+    --muted: oklch(0.965 0.008 274);
+    --muted-foreground: oklch(0.505 0.025 272);
+    --accent: oklch(0.95 0.014 274);
+    --accent-foreground: oklch(0.3 0.05 270);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.92 0.01 274);
+    --input: oklch(0.92 0.01 274);
+    --ring: oklch(0.575 0.2 268);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    /* 略大圆角 = 更亲和甜美 */
+    --radius: 0.8rem;
+    /* 统一缓动：ease-out-quint，自然减速、无弹跳 */
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    }
+  html {
+    @apply font-sans;
+    }
+  /* 标题更均衡的断行；长正文减少孤字 */
+  h1, h2, h3 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+}
+
+/* 开场入场/呼吸动效（CSS-only；reduced-motion 下瞬时完成） */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes halo-breathe {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%      { opacity: 0.85; transform: scale(1.05); }
+}
+@keyframes caret-blink { 50% { opacity: 0; } }
+/* 形象切换过渡：新形象立绘进场 + 一道扫光（覆盖热切的几秒，绝不用旧画面当过渡） */
+@keyframes avatar-rise { from { opacity: 0; transform: scale(1.06); } to { opacity: 1; transform: scale(1); } }
+@keyframes sweep-x { 0% { transform: translateX(-130%); } 100% { transform: translateX(130%); } }
+.anim-fade-up { animation: fade-up 0.65s var(--ease-out) both; }
+/* 徽章解锁高光：卡片弹入 + 环绕撒花 + 遮罩淡入 */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes badge-pop {
+  0%   { opacity: 0; transform: scale(0.82); }
+  55%  { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes confetti-burst {
+  0%   { opacity: 0; transform: translate(-50%, -50%) rotate(var(--ang)) translateY(0) scale(0.6); }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--ang)) translateY(-72px) scale(1); }
+}
+
+/* 减少动效偏好：尊重系统设置，关闭非必要动画 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important; /* 否则 both 填充的 stagger 元素会卡在透明态 */
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

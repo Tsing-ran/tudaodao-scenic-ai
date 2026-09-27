@@ -1,0 +1,36 @@
+@startuml 03_RAG全链路流程
+!include _style.puml
+
+start
+:游客提问 query;
+:多智能体 Orchestrator\n意图分类;
+if (闲聊 chitchat?) then (是)
+  :跳过检索;
+else (否)
+  if (命中答案缓存 LRU?) then (是)
+    :直接返回 (<5ms);
+    stop
+  else (否)
+  endif
+  if (含指代词?) then (是)
+    :Query Rewrite\n(qwen-flash 改写);
+  else (否)
+  endif
+  fork
+    :稠密检索\nBGE-M3 → ChromaDB\n余弦相似度 Top-10;
+  fork again
+    :稀疏检索\nBM25 关键词 Top-10;
+  end fork
+  :EA-RAG 融合（自研）\n实体锚定 + 自适应加权 RRF;
+  :BGE-Reranker 重排;
+  if (top1 置信度 < 阈值?) then (是)
+    :判定知识库无答案\n→ 兜底话术（防幻觉）;
+  else (否)
+    :取 Top-4;
+  endif
+endif
+:组装 Prompt\n(知识 + 人格 + 意图 + 情境);
+:qwen-plus 流式生成;
+:抽取 [情绪:X]\n逐句输出 + 落库;
+stop
+@enduml

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<!-- 图：多智能体分派（分类级联 → 五类意图 → 汇聚 · Visio 风格）。源文件。渲染宽≈2820 → {width≈98%}。 -->
+<html lang="zh"><head><meta charset="utf-8"><link rel="stylesheet" href="_kit.css">
+<style>
+  .fig{width:2820px;}
+  .col{display:flex;flex-direction:column;align-items:center;}
+  .start{border-radius:40px;border:3px solid #5b6775;background:#f1f3f5;color:#2c3440;
+    font-size:54px;font-weight:700;padding:16px 48px;white-space:nowrap;}
+  .panel{width:100%;border-radius:18px;border:3px solid #c9a227;background:#fcf6e0;
+    box-shadow:5px 8px 14px rgba(60,70,85,0.20);overflow:hidden;}
+  .panel .ph{background:#c9a227;color:#fff;font-size:52px;font-weight:700;padding:16px 28px;white-space:nowrap;}
+  .panel .pb{padding:24px 32px;display:flex;flex-direction:column;gap:16px;}
+  .casc{display:flex;align-items:center;gap:24px;flex-wrap:nowrap;}
+  .box{border-radius:12px;padding:16px 26px;font-size:50px;white-space:nowrap;background:#fff;border:3px solid #b9933a;color:#222834;}
+  .box b{color:#a9801f;}
+  .arr{font-size:54px;color:#7a8595;font-weight:700;}
+  .intents{display:flex;gap:24px;width:100%;}
+  .intent{flex:1 1 0;min-width:0;border-radius:16px;border:3px solid var(--c);background:var(--tint);
+    box-shadow:4px 6px 12px rgba(60,70,85,0.20);overflow:hidden;display:flex;flex-direction:column;}
+  .intent .ih{background:var(--c);color:#fff;font-size:46px;font-weight:700;padding:14px 12px;text-align:center;white-space:nowrap;}
+  .intent .ib{flex:1 1 0;padding:20px 18px;display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center;justify-content:center;}
+  .intent .il{font-size:46px;color:#222834;line-height:1.28;white-space:nowrap;}
+  .merge{width:100%;border-radius:16px;border:3px solid #1f9b6c;background:#1f9b6c;color:#fff;
+    font-size:54px;font-weight:700;line-height:1.3;padding:24px;text-align:center;box-shadow:4px 6px 12px rgba(60,70,85,0.24);}
+  .adown svg{display:block;} .albl{margin-left:18px;}
+</style></head><body>
+<div class="fig"><div class="col">
+
+  <div class="start">游客提问 query</div>
+  <div class="adown"><svg width="50" height="48"><line x1="25" y1="2" x2="25" y2="30" stroke="#5a6473" stroke-width="6"/><polygon points="25,48 14,28 36,28" fill="#5a6473"/></svg></div>
+
+  <div class="panel">
+    <div class="ph">分类路由（规则优先 · LLM 兜底）</div>
+    <div class="pb">
+      <div class="casc">
+        <div class="box">规则快筛<br><span style="font-size:42px;color:#5b6675;">高频关键词匹配</span></div>
+        <span class="arr">→</span>
+        <div class="box"><b>命中 · 0ms</b>　直接路由</div>
+        <span class="arr">／</span>
+        <div class="box">未命中 → 问题模糊？<b>是</b> qwen-flash 兜底　<b>否</b> 默认 qa</div>
+      </div>
+    </div>
+  </div>
+  <div class="adown"><svg width="50" height="48"><line x1="25" y1="2" x2="25" y2="30" stroke="#5a6473" stroke-width="6"/><polygon points="25,48 14,28 36,28" fill="#5a6473"/></svg><span class="albl" style="font-size:48px;font-weight:700;color:#46505e;">按意图分派</span></div>
+
+  <div class="intents">
+    <div class="intent c-teal"><div class="ih">qa 知识问答</div><div class="ib"><div class="il">走完整</div><div class="il">RAG 检索</div></div></div>
+    <div class="intent c-blue"><div class="ih">navigation 路线</div><div class="ib"><div class="il">逐段指路</div><div class="il">+ 客流 / 天气</div></div></div>
+    <div class="intent c-indigo"><div class="ih">recommend 推荐</div><div class="ib"><div class="il">推荐指令</div><div class="il">+ 客流 / 天气</div></div></div>
+    <div class="intent c-purple"><div class="ih">empathy 安抚</div><div class="ib"><div class="il">注入共情</div><div class="il">关怀指令</div></div></div>
+    <div class="intent c-orange"><div class="ih">chitchat 闲聊</div><div class="ib"><div class="il">跳过检索</div><div class="il">轻量应答</div></div></div>
+  </div>
+  <div class="adown"><svg width="50" height="48"><line x1="25" y1="2" x2="25" y2="30" stroke="#5a6473" stroke-width="6"/><polygon points="25,48 14,28 36,28" fill="#5a6473"/></svg></div>
+
+  <div class="merge">注入差异化任务指令 + 同行人格（group_type）　→　统一进入生成链路</div>
+
+</div></div></body></html>

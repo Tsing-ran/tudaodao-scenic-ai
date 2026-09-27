@@ -1,0 +1,357 @@
+diff --git a/core/atomic_components/motion_stitch.py b/core/atomic_components/motion_stitch.py
+index 7967984..a80a576 100644
+--- a/core/atomic_components/motion_stitch.py
++++ b/core/atomic_components/motion_stitch.py
+@@ -1,4 +1,5 @@
+ import copy
++import os
+ import random
+ import numpy as np
+ from scipy.special import softmax
+@@ -444,6 +445,16 @@ class MotionStitch:
+             self.fix_exp_a3,
+         )
+ 
++        # 嘴幅热调（DITTO_LIP_SCALE，env 每帧读，0 开销）：把 lip 维度朝 source(闭口)拉，
++        # scale<1 收小张口（1.0=原始，越小越含蓄）。lip 维索引同 _fix_exp。
++        _lip_scale = float(os.environ.get("DITTO_LIP_SCALE", "1.0"))
++        if _lip_scale < 0.999:
++            _lip_dims = [6, 12, 14, 17, 19, 20]
++            _a = np.zeros((21, 3), dtype=x_d_info["exp"].dtype)
++            _a[_lip_dims] = 1.0 - _lip_scale
++            _a = _a.reshape(1, -1)
++            x_d_info["exp"] = x_d_info["exp"] * (1 - _a) + x_s_info["exp"] * _a
++
+         if kwargs.get("vad_alpha", 1) < 1:
+             x_d_info = ctrl_vad(x_d_info, x_s_info, kwargs.get("vad_alpha", 1))
+ 
+diff --git a/core/atomic_components/putback.py b/core/atomic_components/putback.py
+index 39a5a6d..a8d72b9 100644
+--- a/core/atomic_components/putback.py
++++ b/core/atomic_components/putback.py
+@@ -46,15 +46,43 @@ class PutBack:
+ 
+     def __call__(self, frame_rgb, render_image, M_c2o):
+         h, w = frame_rgb.shape[:2]
+-        mask_warped = cv2.warpAffine(
+-            self.mask_ori_float, M_c2o[:2, :], dsize=(w, h), flags=cv2.INTER_LINEAR
+-        ).clip(0, 1)
+-        frame_warped = cv2.warpAffine(
+-            render_image, M_c2o[:2, :], dsize=(w, h), flags=cv2.INTER_LINEAR
+-        )
+-        self.result_buffer = np.empty((h, w, 3), dtype=np.uint8)
+-
+-        # Use Cython implementation for blending
+-        blend_images_cy(mask_warped, frame_warped, frame_rgb, self.result_buffer)
++        # 静态肖像 M_c2o 每帧恒定→mask_warped/ROI 不变，缓存复用
++        # ROI 优化（20260712）：mask 只覆盖人脸 warp 区域（720x1280 竖版约 1/4 面积），
++        # 区外像素与底图完全相同，warp 与 blend 只在 ROI 内做，其余整帧拷贝。
++        _key = (h, w, M_c2o.tobytes())
++        if getattr(self, "_mw_key", None) != _key:
++            mw = cv2.warpAffine(
++                self.mask_ori_float, M_c2o[:2, :], dsize=(w, h), flags=cv2.INTER_LINEAR
++            ).clip(0, 1)
++            ys, xs = np.where(mw > 1e-4)
++            if len(ys) == 0:
++                x0, y0, x1, y1 = 0, 0, w, h
++            else:
++                y0 = max(int(ys.min()) - 2, 0); y1 = min(int(ys.max()) + 3, h)
++                x0 = max(int(xs.min()) - 2, 0); x1 = min(int(xs.max()) + 3, w)
++            self._roi = (x0, y0, x1, y1)
++            self._mw_roi = np.ascontiguousarray(mw[y0:y1, x0:x1])
++            M_roi = M_c2o[:2, :].astype(np.float64).copy()
++            M_roi[0, 2] -= x0
++            M_roi[1, 2] -= y0
++            self._M_roi = M_roi
++            self._mw_key = _key
++        x0, y0, x1, y1 = self._roi
++        rw, rh = x1 - x0, y1 - y0
+ 
+-        return self.result_buffer
+\ No newline at end of file
++        frame_warped_roi = cv2.warpAffine(
++            render_image, self._M_roi, dsize=(rw, rh), flags=cv2.INTER_LINEAR
++        )
++        # 每帧新分配输出（下游队列持有引用，不能复用缓冲）
++        result = np.empty((h, w, 3), dtype=np.uint8)
++        np.copyto(result, frame_rgb)
++        roi_out = np.empty((rh, rw, 3), dtype=np.uint8)
++        blend_images_cy(
++            self._mw_roi,
++            frame_warped_roi,
++            np.ascontiguousarray(frame_rgb[y0:y1, x0:x1]),
++            roi_out,
++        )
++        result[y0:y1, x0:x1] = roi_out
++        self.result_buffer = result
++        return result
+\ No newline at end of file
+diff --git a/core/models/decoder.py b/core/models/decoder.py
+index 54f6336..27b657a 100644
+--- a/core/models/decoder.py
++++ b/core/models/decoder.py
+@@ -16,9 +16,34 @@ class Decoder:
+         if self.model_type == "onnx":
+             pred = self.model.run(None, {"feature": feature})[0]
+         elif self.model_type == "tensorrt":
+-            self.model.setup({"feature": feature})
+-            self.model.infer()
+-            pred = self.model.buffer["output"][0].copy()
++            m = self.model
++            _is_torch = hasattr(feature, "data_ptr") and getattr(feature, "is_cuda", False)
++            if _is_torch:
++                _shp = tuple(int(x) for x in feature.shape)
++                _npdt = np.float16 if feature.dtype == torch.float16 else np.float32
++                if getattr(self, "_dummy_shp", None) != _shp:
++                    self._dummy = np.empty(_shp, dtype=_npdt); self._dummy_shp = _shp
++                m.setup({"feature": self._dummy})  # 仅给 shape，不拷数据（缓存复用）
++                m.context.set_tensor_address("feature", feature.data_ptr())  # TRT 直接读 warp 的 GPU 输出
++                m.skip_h2d = {"feature"}
++            else:
++                m.setup({"feature": feature})
++            out_name = "output"
++            if getattr(self, "_gpu_out", None) is None:
++                import tensorrt as trt
++                shp = tuple(int(x) for x in m.context.get_tensor_shape(out_name))
++                npdt = np.dtype(trt.nptype(m.engine.get_tensor_dtype(out_name)))
++                tdt = torch.float16 if npdt == np.float16 else torch.float32
++                self._gpu_out = torch.empty(shp, dtype=tdt, device="cuda")
++            # 让 TRT 把输出直接写进常驻 GPU tensor，跳过 TRT 的 D2H
++            m.context.set_tensor_address(out_name, self._gpu_out.data_ptr())
++            m.skip_d2h = {out_name}
++            m.infer()
++            m.skip_d2h = ()
++            m.skip_h2d = ()
++            # GPU 上做 (1,3,H,W)->(H,W,3)、clip、*255（原 CPU 的 ~9ms 后处理），只把成品图 D2H
++            pred = self._gpu_out[0].permute(1, 2, 0).float().clamp(0, 1).mul(255)
++            return pred.contiguous().cpu().numpy()
+         elif self.model_type == 'pytorch':
+             with torch.no_grad(), torch.autocast(device_type=self.device[:4], dtype=torch.float16, enabled=True):
+                 pred = self.model(torch.from_numpy(feature).to(self.device)).float().cpu().numpy()
+diff --git a/core/models/warp_network.py b/core/models/warp_network.py
+index 8f14edf..a98c6bb 100644
+--- a/core/models/warp_network.py
++++ b/core/models/warp_network.py
+@@ -19,9 +19,26 @@ class WarpNetwork:
+         if self.model_type == "onnx":
+             pred = self.model.run(None, {"feature_3d": feature_3d, "kp_source": kp_source, "kp_driving": kp_driving})[0]
+         elif self.model_type == "tensorrt":
+-            self.model.setup({"feature_3d": feature_3d, "kp_source": kp_source, "kp_driving": kp_driving})
+-            self.model.infer()
+-            pred = self.model.buffer["out"][0].copy()
++            m = self.model
++            # f_s(外观特征 8MB)对静态肖像每帧恒定→缓存到 GPU，只 H2D 一次，省 8MB/帧
++            if getattr(self, "_fs_id", None) != id(feature_3d):
++                self._fs_gpu = torch.from_numpy(np.ascontiguousarray(feature_3d)).cuda()
++                self._fs_id = id(feature_3d)
++            m.setup({"feature_3d": feature_3d, "kp_source": kp_source, "kp_driving": kp_driving})
++            m.context.set_tensor_address("feature_3d", self._fs_gpu.data_ptr())  # TRT 直接读缓存的 GPU f_s
++            m.skip_h2d = {"feature_3d"}
++            out_name = "out"
++            import tensorrt as trt
++            shp = tuple(int(x) for x in m.context.get_tensor_shape(out_name))
++            npdt = np.dtype(trt.nptype(m.engine.get_tensor_dtype(out_name)))
++            tdt = torch.float16 if npdt == np.float16 else torch.float32
++            out_t = torch.empty(shp, dtype=tdt, device="cuda")  # 每帧全新，refcount 随队列管理→无竞态
++            m.context.set_tensor_address(out_name, out_t.data_ptr())
++            m.skip_d2h = {out_name}
++            m.infer()
++            m.skip_d2h = ()
++            m.skip_h2d = ()
++            return out_t   # 返回 GPU 张量，直接喂 decode（不回 CPU）
+         elif self.model_type == 'pytorch':
+             with torch.no_grad(), torch.autocast(device_type=self.device[:4], dtype=torch.float16, enabled=True):
+                 pred = self.model(
+diff --git a/core/utils/tensorrt_utils.py b/core/utils/tensorrt_utils.py
+index ff233b9..6cc2fb4 100644
+--- a/core/utils/tensorrt_utils.py
++++ b/core/utils/tensorrt_utils.py
+@@ -107,9 +107,23 @@ class TRTWrapper:
+         self.buffer = OrderedDict()
+         self.output_allocator_map = OrderedDict()
+         self.context = self.engine.create_execution_context()
++        # 每模型独立非阻塞流（20260712）：默认流 0 会让同进程所有 TRT 阶段串行，
++        # 各自成流后 warp(n+1) 可与 decode(n) 在 GPU 上并行，吞吐上限=最慢单段
++        self.stream = checkCudaErrors(
++            cudart.cudaStreamCreateWithFlags(cudart.cudaStreamNonBlocking)
++        )
+         return
+ 
+     def setup(self, input_data: dict = {}) -> None:
++        # 快路径：固定分辨率流式场景，输入形状不变则复用已分配 buffer，
++        # 跳过每帧 cudaFree+cudaMalloc 重分配（重操作，省数 ms/帧）。地址/shape 在 TRT context 里持久。
++        _shapes = tuple((k, tuple(v.shape)) for k, v in input_data.items())
++        if getattr(self, "_fast_shapes", None) == _shapes and self.buffer:
++            for name, data in input_data.items():
++                if name in self.buffer:
++                    self.buffer[name][0] = np.ascontiguousarray(data)
++            return
++        self._fast_shapes = _shapes
+         for name, value in self.buffer.items():
+             _, device_buffer, _ = value
+             if (
+@@ -178,21 +192,25 @@ class TRTWrapper:
+ 
+         return
+ 
+-    def infer(self, stream=0) -> None:
+-        # Do inference and print output
++    def infer(self, stream=None) -> None:
++        # 全部排到本实例的独立流上，末尾同步；对调用者仍是同步语义
++        _s = self.stream if stream in (None, 0) else stream
+         for name in self.tensor_name_list:
+             if (
+                 self.engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT
+                 and self.engine.get_tensor_location(name) == trt.TensorLocation.DEVICE
+             ):
+-                cudart.cudaMemcpy(
++                if name in getattr(self, "skip_h2d", ()):
++                    continue
++                cudart.cudaMemcpyAsync(
+                     self.buffer[name][1],
+                     self.buffer[name][0].ctypes.data,
+                     self.buffer[name][2],
+                     cudart.cudaMemcpyKind.cudaMemcpyHostToDevice,
++                    _s,
+                 )
+ 
+-        self.context.execute_async_v3(stream)
++        self.context.execute_async_v3(_s)
+ 
+         for name in self.output_allocator_map:
+             myOutputAllocator = self.context.get_output_allocator(name)
+@@ -208,13 +226,17 @@ class TRTWrapper:
+                 self.engine.get_tensor_mode(name) == trt.TensorIOMode.OUTPUT
+                 and self.engine.get_tensor_location(name) == trt.TensorLocation.DEVICE
+             ):
+-                cudart.cudaMemcpy(
++                if name in getattr(self, "skip_d2h", ()):
++                    continue
++                cudart.cudaMemcpyAsync(
+                     self.buffer[name][0].ctypes.data,
+                     self.buffer[name][1],
+                     self.buffer[name][2],
+                     cudart.cudaMemcpyKind.cudaMemcpyDeviceToHost,
++                    _s,
+                 )
+ 
++        checkCudaErrors(cudart.cudaStreamSynchronize(_s))
+         return
+ 
+     def infer_async(self, stream=0) -> None:
+diff --git a/scripts/cvt_onnx_to_trt.py b/scripts/cvt_onnx_to_trt.py
+index 8e7b1c0..d9a337c 100644
+--- a/scripts/cvt_onnx_to_trt.py
++++ b/scripts/cvt_onnx_to_trt.py
+@@ -6,7 +6,7 @@ import argparse
+ def onnx_to_trt(onnx_file, trt_file, fp16=False, more_cmd=None):
+     cap = torch.cuda.get_device_capability()
+     if cap[0] >= 8:
+-        compatiable = "--hardware-compatibility-level=Ampere_Plus"
++        compatiable = ""  # native Ada build (patched 20260712)
+     else:
+         compatiable = ""
+     cmd = [
+@@ -61,10 +61,7 @@ def onnx_to_trt_for_gridsample(onnx_file, trt_file, fp16=False, plugin_file="./l
+     config.builder_optimization_level = 5
+     # Set the flag of hardware compatibility, Hardware-compatible engines are only supported on Ampere and beyond
+     cap = torch.cuda.get_device_capability()
+-    if cap[0] >= 8:
+-        compatible = True
+-    else:
+-        compatible = False
++    compatible = False  # native Ada build (patched 20260712)
+ 
+     if compatible:
+         config.hardware_compatibility_level = (
+diff --git a/stream_pipeline_online.py b/stream_pipeline_online.py
+index 0fbfd75..04db1a6 100644
+--- a/stream_pipeline_online.py
++++ b/stream_pipeline_online.py
+@@ -1,5 +1,6 @@
+ import threading
+ import queue
++import time
+ import numpy as np
+ import traceback
+ from tqdm import tqdm
+@@ -257,6 +258,19 @@ class StreamSDK:
+         for thread in self.thread_list:
+             thread.start()
+ 
++    # ── 轻量分段计时：定位流水线吞吐瓶颈，每 300 帧打印一次平均毫秒（20260712）──
++    def _prof(self, name, dt):
++        acc = getattr(self, "_prof_acc", None)
++        if acc is None:
++            self._prof_acc, self._prof_cnt = {}, {}
++            acc = self._prof_acc
++        acc[name] = acc.get(name, 0.0) + dt
++        n = self._prof_cnt.get(name, 0) + 1
++        self._prof_cnt[name] = n
++        if n % 300 == 0:
++            print(f"[stage-prof] {name}: avg {acc[name] / 300 * 1000:.1f} ms/frame (n={n})", flush=True)
++            acc[name] = 0.0
++
+     def _get_ctrl_info(self, fid):
+         try:
+             if isinstance(self.ctrl_info, dict):
+@@ -286,7 +300,9 @@ class StreamSDK:
+             if item is None:
+                 break
+             res_frame_rgb = item
++            _t = time.perf_counter()
+             self.writer(res_frame_rgb, fmt="rgb")
++            self._prof("writer", time.perf_counter() - _t)
+             self.writer_pbar.update()
+ 
+     def putback_worker(self):
+@@ -308,7 +324,9 @@ class StreamSDK:
+             frame_idx, render_img = item
+             frame_rgb = self.source_info["img_rgb_lst"][frame_idx]
+             M_c2o = self.source_info["M_c2o_lst"][frame_idx]
++            _t = time.perf_counter()
+             res_frame_rgb = self.putback(frame_rgb, render_img, M_c2o)
++            self._prof("putback", time.perf_counter() - _t)
+             self.writer_queue.put(res_frame_rgb)
+ 
+     def decode_f3d_worker(self):
+@@ -328,7 +346,9 @@ class StreamSDK:
+                 self.putback_queue.put(None)
+                 break
+             frame_idx, f_3d = item
++            _t = time.perf_counter()
+             render_img = self.decode_f3d(f_3d)
++            self._prof("decode", time.perf_counter() - _t)
+             self.putback_queue.put([frame_idx, render_img])
+ 
+     def warp_f3d_worker(self):
+@@ -349,7 +369,9 @@ class StreamSDK:
+                 break
+             frame_idx, x_s, x_d = item
+             f_s = self.source_info["f_s_lst"][frame_idx]
++            _t = time.perf_counter()
+             f_3d = self.warp_f3d(f_s, x_s, x_d)
++            self._prof("warp", time.perf_counter() - _t)
+             self.decode_f3d_queue.put([frame_idx, f_3d])
+ 
+     def motion_stitch_worker(self):
+@@ -371,7 +393,9 @@ class StreamSDK:
+             
+             frame_idx, x_d_info, ctrl_kwargs = item
+             x_s_info = self.source_info["x_s_info_lst"][frame_idx]
++            _t = time.perf_counter()
+             x_s, x_d = self.motion_stitch(x_s_info, x_d_info, **ctrl_kwargs)
++            self._prof("stitch", time.perf_counter() - _t)
+             self.warp_f3d_queue.put([frame_idx, x_s, x_d])
+ 
+     def audio2motion_worker(self):
+@@ -428,7 +452,9 @@ class StreamSDK:
+                         aud_feat = np.concatenate([aud_feat, pad], 0)
+ 
+                 aud_cond = self.condition_handler(aud_feat, global_idx + self.cond_idx_start)[None]
++                _t = time.perf_counter()
+                 res_kp_seq = self.audio2motion(aud_cond, res_kp_seq)
++                self._prof("a2m/frame", (time.perf_counter() - _t) / max(1, real_valid_len))
+                 if res_kp_seq_valid_start is None:
+                     # online mode, first chunk
+                     res_kp_seq_valid_start = res_kp_seq.shape[1] - self.audio2motion.fuse_length

@@ -1,0 +1,83 @@
+[
+  {
+    "cand_id": "cand_20260713_200250_7",
+    "scenic_id": "lingshan",
+    "seed": 1768453073,
+    "center_offset_pct": 0.3,
+    "centered": true,
+    "preview": "/rag/digital-human/candidate-preview/cand_20260713_200250_7",
+    "created_at": "2026-07-13 20:03:29"
+  },
+  {
+    "cand_id": "cand_20260713_200214_6",
+    "scenic_id": "lingshan",
+    "seed": 1768448260,
+    "center_offset_pct": 3.5,
+    "centered": false,
+    "preview": "/rag/digital-human/candidate-preview/cand_20260713_200214_6",
+    "created_at": "2026-07-13 20:02:50"
+  },
+  {
+    "cand_id": "cand_20260713_200147_5",
+    "scenic_id": "lingshan",
+    "seed": 1768444626,
+    "center_offset_pct": 5.7,
+    "centered": false,
+    "preview": "/rag/digital-human/candidate-preview/cand_20260713_200147_5",
+    "created_at": "2026-07-13 20:02:14"
+  },
+  {
+    "cand_id": "cand_20260713_200112_4",
+    "scenic_id": "lingshan",
+    "seed": 1768439944,
+    "center_offset_pct": 0.3,
+    "centered": true,
+    "preview": "/rag/digital-human/candidate-preview/cand_20260713_200112_4",
+    "created_at": "2026-07-13 20:01:47"
+  },
+  {
+    "cand_id": "cand_20260713_200036_3",
+    "scenic_id": "lingshan",
+    "seed": 1768435131,
+    "center_offset_pct": 0.6,
+    "centered": true,
+    "preview": "/rag/digital-human/candidate-preview/cand_20260713_200036_3",
+    "created_at": "2026-07-13 20:01:12"
+  },
+  {
+    "cand_id": "cand_20260713_200001_2",
+    "scenic_id": "lingshan",
+    "seed": 1768430449,
+    "center_offset_pct": 0.2,
+    "centered": true,
+    "preview": "/rag/digital-human/candidate-preview/cand_20260713_200001_2",
+    "created_at": "2026-07-13 20:00:36"
+  },
+  {
+    "cand_id": "cand_20260713_195925_1",
+    "scenic_id": "lingshan",
+    "seed": 1768425636,
+    "center_offset_pct": 0.5,
+    "centered": true,
+    "preview": "/rag/digital-human/candidate-preview/cand_20260713_195925_1",
+    "created_at": "2026-07-13 20:00:01"
+  },
+  {
+    "cand_id": "cand_20260713_195850_0",
+    "scenic_id": "lingshan",
+    "seed": 1768420954,
+    "center_offset_pct": 9.0,
+    "centered": false,
+    "preview": "/rag/digital-human/candidate-preview/cand_20260713_195850_0",
+    "created_at": "2026-07-13 19:59:25"
+  },
+  {
+    "cand_id": "cand_20260713_191136_1",
+    "scenic_id": "lingshan",
+    "seed": 1768049797,
+    "center_offset_pct": 2.2,
+    "centered": true,
+    "preview": "/rag/digital-human/candidate-preview/cand_20260713_191136_1",
+    "created_at": "2026-07-13 19:12:03"
+  }
+]

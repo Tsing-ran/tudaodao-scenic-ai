@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<!-- 图 4-1 五字设计主线（横向 Visio 风格）。源文件。
+     渲染：Playwright 视口宽 2880 → 截图 .figure → 00_设计主线五字.png。
+     A4 五号：2880px 宽，文档 {width=100%} 时 body 66px = 五号。
+     越界自检：JS 查 scrollWidth<=clientWidth，浏览器真实排版，装不下自动换行。 -->
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#fff; font-family:"Noto Sans CJK SC","Source Han Sans SC",sans-serif; }
+  .figure { width:2880px; padding:40px; background:#fff; }
+  .row { display:flex; align-items:stretch; gap:0; }
+  .card {
+    flex:1 1 0; min-width:0; border-radius:18px; overflow:hidden;
+    border:3px solid var(--c); background:var(--tint);
+    box-shadow:6px 9px 15px rgba(60,70,85,0.30);
+    display:flex; flex-direction:column;
+  }
+  .head { background:var(--c); color:#fff; padding:18px 10px 14px; text-align:center; }
+  .zi { font-size:104px; font-weight:700; line-height:1.0; }
+  .role { font-size:66px; font-weight:700; line-height:1.25; }
+  .body { padding:18px 14px 22px; text-align:center; }
+  .tag {
+    display:inline-block; font-size:52px; font-weight:700; color:var(--c);
+    background:#fff; border:3px solid var(--c); border-radius:34px;
+    padding:4px 24px; margin-bottom:14px; white-space:nowrap;
+  }
+  .line { font-size:66px; color:#222834; line-height:1.38; white-space:nowrap; }
+  .conn { flex:0 0 64px; display:flex; align-items:center; justify-content:center; }
+  .conn svg { display:block; }
+  .logic {
+    margin-top:54px; height:120px; border-radius:16px;
+    background:#f4f6f8; border:2px solid #cdd4dc;
+    display:flex; align-items:center; justify-content:center;
+    font-size:60px; font-weight:700; color:#2c3440; letter-spacing:2px; white-space:nowrap;
+  }
+</style>
+</head>
+<body>
+<div class="figure">
+  <div class="row">
+    <div class="card" style="--c:#2e86de;--tint:#dceafb;">
+      <div class="head"><div class="zi">准</div><div class="role">事实准确</div></div>
+      <div class="body"><span class="tag">底线</span>
+        <div class="line">4.1 RAG 引擎</div><div class="line">准确率 97.1%</div><div class="line">拒答纠错 100%</div></div>
+    </div>
+    <div class="conn"><svg width="60" height="40"><line x1="2" y1="20" x2="44" y2="20" stroke="#5a6473" stroke-width="6"/><polygon points="58,20 36,9 36,31" fill="#5a6473"/></svg></div>
+    <div class="card" style="--c:#16a085;--tint:#d6f0ea;">
+      <div class="head"><div class="zi">懂</div><div class="role">情境理解</div></div>
+      <div class="body"><span class="tag">体验上限</span>
+        <div class="line">4.2 多智能体</div><div class="line">4.3 时空情境</div><div class="line">4.4 视觉定位</div></div>
+    </div>
+    <div class="conn"><svg width="60" height="40"><line x1="2" y1="20" x2="44" y2="20" stroke="#5a6473" stroke-width="6"/><polygon points="58,20 36,9 36,31" fill="#5a6473"/></svg></div>
+    <div class="card" style="--c:#8e44ad;--tint:#ece0f4;">
+      <div class="head"><div class="zi">像</div><div class="role">形象自然</div></div>
+      <div class="body"><span class="tag">形态成立</span>
+        <div class="line">4.5 数字人驱动</div><div class="line">Ditto 25.5fps</div><div class="line">情绪表情联动</div></div>
+    </div>
+    <div class="conn"><svg width="60" height="40"><line x1="2" y1="20" x2="44" y2="20" stroke="#5a6473" stroke-width="6"/><polygon points="58,20 36,9 36,31" fill="#5a6473"/></svg></div>
+    <div class="card" style="--c:#e67e22;--tint:#fce6d2;">
+      <div class="head"><div class="zi">快</div><div class="role">响应及时</div></div>
+      <div class="body"><span class="tag">形态成立</span>
+        <div class="line">4.6 延迟优化</div><div class="line">端到端约 4.4s</div><div class="line">&lt;5s 首句 1.8s</div></div>
+    </div>
+    <div class="conn"><svg width="60" height="40"><line x1="2" y1="20" x2="44" y2="20" stroke="#5a6473" stroke-width="6"/><polygon points="58,20 36,9 36,31" fill="#5a6473"/></svg></div>
+    <div class="card" style="--c:#c9a227;--tint:#fcf3d0;">
+      <div class="head"><div class="zi">廉</div><div class="role">成本可控</div></div>
+      <div class="body"><span class="tag">可运营</span>
+        <div class="line">4.7–4.8 调度</div><div class="line">单游客 &lt; 1 元</div><div class="line">真人 15–25 元</div></div>
+    </div>
+  </div>
+  <div class="logic">递进关系　准保下限　→　懂提上限　→　像与快立形态　→　廉定运营</div>
+</div>
+</body>
+</html>

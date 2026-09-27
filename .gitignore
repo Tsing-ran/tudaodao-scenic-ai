@@ -1,0 +1,54 @@
+# Local secrets and machine-specific configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+.mcp.json
+admin/backend/data/users.json
+
+# Python caches, environments and generated output
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+build/
+dist/
+*.log
+logs/
+*.pid
+*.sock
+
+# Frontend dependencies and builds
+node_modules/
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/.vite/
+**/.cache/
+
+# Runtime data and model artifacts
+vector_store/
+conversations.db
+*.sqlite
+*.sqlite3
+*.db
+*.onnx
+*.engine
+*.pth
+*.pt
+*.ckpt
+
+# Archives and local OS / IDE files
+*.tar.gz
+*.zip
+.DS_Store
+.idea/
+.vscode/
+Thumbs.db

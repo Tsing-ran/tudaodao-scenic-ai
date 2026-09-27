@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>智游·导览 — 数字人</title>
+<style>
+  :root{
+    --bg:#FFFFFF; --surface:#F8FAFC; --surface-2:#F1F5F9;
+    --text:#0F172A; --text-2:#64748B; --border:#E8EDF3;
+    --primary:#2563EB; --primary-ink:#1D4ED8;
+    --success:#16A34A; --danger:#DC2626; --amber:#D97706;
+    --r:18px; --r-sm:12px; --pill:999px;
+    --shadow:0 4px 20px rgba(15,23,42,.06), 0 1px 3px rgba(15,23,42,.04);
+    --shadow-lg:0 10px 34px rgba(37,99,235,.16);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{font-family:-apple-system,"PingFang SC",system-ui,sans-serif;background:var(--bg);color:var(--text);
+       min-height:100dvh;display:flex;flex-direction:column;max-width:520px;margin:0 auto;
+       padding-bottom:env(safe-area-inset-bottom);}
+
+  /* 顶栏 */
+  header{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:10px;
+         padding:14px 16px calc(14px) 16px;background:rgba(255,255,255,.86);
+         backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);
+         border-bottom:1px solid var(--border);}
+  .logo{width:34px;height:34px;border-radius:10px;flex:none;display:grid;place-items:center;
+        background:linear-gradient(135deg,#2563EB,#60A5FA);color:#fff;font-size:18px;
+        box-shadow:0 4px 12px rgba(37,99,235,.32);}
+  .brand{display:flex;flex-direction:column;line-height:1.15;}
+  .brand b{font-size:16px;font-weight:700;letter-spacing:.2px;}
+  .brand span{font-size:11px;color:var(--text-2);}
+  .scenic{margin-left:auto;position:relative;}
+  .scenic select{appearance:none;-webkit-appearance:none;background:var(--surface-2);color:var(--text);
+        border:1px solid var(--border);padding:8px 30px 8px 14px;border-radius:var(--pill);
+        font-size:13px;font-weight:600;}
+  .scenic::after{content:"▾";position:absolute;right:12px;top:50%;transform:translateY(-50%);
+        color:var(--text-2);font-size:11px;pointer-events:none;}
+
+  /* 数字人舞台 */
+  .stage{position:relative;margin:14px auto 0;border-radius:var(--r);overflow:hidden;
+         width:min(78vw,300px);aspect-ratio:9/16;max-height:48dvh;
+         background:radial-gradient(120% 90% at 50% 28%,#EEF3FF,#F8FAFC 70%);
+         box-shadow:var(--shadow);}
+  .stage video{width:100%;height:100%;object-fit:cover;display:block;background:transparent;}
+  /* 未连接时舞台中央的占位（柔和品牌感，替代黑框） */
+  .stage::before{content:"";position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);
+        width:96px;height:96px;border-radius:50%;
+        background:radial-gradient(circle at 50% 40%,rgba(37,99,235,.18),rgba(37,99,235,0) 70%);}
+  .stage.playing::before{display:none;}
+  .badge{position:absolute;top:12px;left:12px;z-index:3;display:inline-flex;align-items:center;gap:6px;
+         font-size:11px;font-weight:600;padding:5px 11px;border-radius:var(--pill);
+         background:rgba(255,255,255,.92);color:var(--text-2);box-shadow:var(--shadow);}
+  .badge::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--text-2);}
+  .badge.on{color:var(--success);} .badge.on::before{background:var(--success);box-shadow:0 0 0 3px rgba(22,163,74,.18);}
+  .badge.off{color:var(--danger);} .badge.off::before{background:var(--danger);}
+
+  .overlay{position:absolute;inset:0;z-index:4;display:flex;align-items:center;justify-content:center;}
+  .overlay button{display:inline-flex;align-items:center;gap:8px;background:var(--primary);color:#fff;border:none;
+         padding:15px 30px;border-radius:var(--pill);font-size:16px;font-weight:700;
+         box-shadow:var(--shadow-lg);cursor:pointer;transition:transform .15s,box-shadow .15s;}
+  .overlay button:active{transform:scale(.96);}
+
+  .pills{position:absolute;left:12px;right:12px;bottom:12px;z-index:3;display:flex;gap:6px;flex-wrap:wrap;}
+  .pill{font-size:11px;font-weight:600;padding:5px 10px;border-radius:var(--pill);
+        background:rgba(255,255,255,.92);color:var(--primary);box-shadow:var(--shadow);}
+  .pill.emo{color:var(--amber);} .pill.tm{color:var(--text-2);}
+
+  /* 内容区 */
+  .panel{flex:1;padding:0 16px 16px;display:flex;flex-direction:column;gap:14px;}
+  .reply{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+         padding:16px;font-size:15.5px;line-height:1.7;min-height:72px;color:var(--text);
+         white-space:pre-wrap;word-break:break-word;}
+  .reply.thinking{color:var(--text-2);}
+  .dots span{display:inline-block;width:6px;height:6px;margin:0 2px;border-radius:50%;
+        background:var(--text-2);animation:blink 1.2s infinite both;}
+  .dots span:nth-child(2){animation-delay:.2s;} .dots span:nth-child(3){animation-delay:.4s;}
+  @keyframes blink{0%,80%,100%{opacity:.25;transform:translateY(0);}40%{opacity:1;transform:translateY(-3px);}}
+
+  /* 建议快问 */
+  .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .chips::-webkit-scrollbar{display:none;}
+  .chip{flex:none;font-size:13px;font-weight:600;color:var(--text);background:var(--bg);
+        border:1px solid var(--border);padding:9px 14px;border-radius:var(--pill);white-space:nowrap;
+        box-shadow:0 1px 2px rgba(15,23,42,.04);cursor:pointer;transition:.15s;}
+  .chip:active{background:var(--surface-2);transform:scale(.97);}
+
+  /* 输入坞 */
+  .dock{position:sticky;bottom:0;display:flex;align-items:center;gap:8px;
+        padding:10px;margin-top:auto;background:var(--bg);border:1px solid var(--border);
+        border-radius:var(--pill);box-shadow:var(--shadow);}
+  .dock input{flex:1;min-width:0;border:none;background:transparent;color:var(--text);font-size:15px;padding:8px 6px;}
+  .dock input::placeholder{color:#94A3B8;}
+  .iconbtn{width:42px;height:42px;flex:none;display:grid;place-items:center;border:none;border-radius:50%;
+        background:var(--surface-2);color:var(--text);font-size:19px;cursor:pointer;transition:.15s;}
+  .iconbtn:disabled{opacity:.4;}
+  .iconbtn:active{transform:scale(.92);}
+  .iconbtn.listening{background:#DBEAFE;color:var(--primary);}
+  .iconbtn.recording{background:var(--danger);color:#fff;animation:pulse 1s infinite;}
+  .iconbtn.recognizing{background:#FEF3C7;color:var(--amber);}
+  .send{width:44px;height:44px;flex:none;display:grid;place-items:center;border:none;border-radius:50%;
+        background:var(--primary);color:#fff;font-size:18px;cursor:pointer;box-shadow:var(--shadow-lg);transition:.15s;}
+  .send:disabled{opacity:.4;box-shadow:none;}
+  .send:active{transform:scale(.92);}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  .hint{font-size:12px;color:#94A3B8;text-align:center;padding-top:2px;}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">灵</div>
+  <div class="brand"><b>灵境·导览</b><span>AI 数字人导游</span></div>
+  <div class="scenic">
+    <select id="scenic">
+      <option value="lingshan">灵山胜境</option>
+      <option value="nihuawan">拈花湾</option>
+      <option value="xihu">西湖</option>
+      <option value="huangshan">黄山</option>
+      <option value="gugong">故宫</option>
+    </select>
+  </div>
+</header>
+
+<div class="stage">
+  <!-- iOS→HLS 原生 / 安卓→mpegts.js FLV（connect() 内按平台选）-->
+  <video id="video" playsinline webkit-playsinline></video>
+  <span class="badge off" id="badge">未连接</span>
+  <div class="overlay" id="overlay"><button onclick="connect()">▶ 开始导览</button></div>
+  <div class="pills" id="pills"></div>
+</div>
+
+<div class="panel">
+  <div class="reply" id="reply">点上方「开始导览」连接数字人，TA 会主动和你打招呼，随后可语音、打字提问，或拍照让我帮你定位讲解。</div>
+
+  <div class="chips" id="chips">
+    <button class="chip" onclick="quickAsk(this)" data-q="这个景区有哪些必看的景点？">必看景点</button>
+    <button class="chip" onclick="quickAsk(this)" data-q="帮我推荐一条游览路线">推荐路线</button>
+    <button class="chip" onclick="quickAsk(this)" data-q="给我讲一个这里的历史故事">讲个故事</button>
+    <button class="chip" onclick="quickAsk(this)" data-q="现在景区人多吗？怎么错峰？">现在人多吗</button>
+    <button class="chip" onclick="quickAsk(this)" data-q="附近有什么特色美食？">附近吃什么</button>
+  </div>
+
+  <div class="dock">
+    <button id="mic" class="iconbtn" onclick="toggleVoice()" disabled title="语音提问">🎤</button>
+    <input id="msg" placeholder="问点什么…" onkeydown="if(event.key==='Enter')ask()">
+    <button id="cam" class="iconbtn" onclick="$('camfile').click()" disabled title="拍照定位">📷</button>
+    <button id="send" class="send" onclick="ask()" disabled>➤</button>
+  </div>
+  <input type="file" id="camfile" accept="image/*" capture="environment" style="display:none" onchange="onPhoto(this.files[0])">
+  <div class="hint" id="hint">点「开始导览」连接数字人</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+// 全部走同源（经桥接 :9000 反代到各后端）：单源 https，零 mixed-content。
+//   /hls/*        → SRS HLS（iOS 原生播放）
+//   /stream.flv   → SRS FLV（安卓 mpegts.js 播放）
+//   /vendor/mpegts.js → 安卓 FLV 播放器
+//   /live/ask|say → 桥接自身
+//   /rag/*        → RAG 后端（/asr /trip/greeting /chat/image）
+const HLS='/hls/livestream_ios.m3u8';    // iOS HLS：中继流(360x640低分辨率/1s GOP/48kHz)，低延迟+iOS可播
+const FLV='/stream.flv';                 // 安卓走 HTTP-FLV（低延迟，<5s 走这条）
+const sessionid='0';                    // RTMP 单路固定 sessionid
+let started=false, player=null;
+
+// 平台检测：iOS Safari 原生播 HLS、不支持 MSE/FLV；安卓 Chromium 反之。
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent)
+           || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+
+function setBadge(t,c){ const b=$('badge'); b.textContent=t; b.className='badge '+(c||''); }
+function onConnected(){
+  started=true; setBadge('已连接 ●','on');
+  document.querySelector('.stage').classList.add('playing');
+  $('send').disabled=false; $('mic').disabled=false; $('cam').disabled=false;
+  $('hint').textContent='🎤 语音提问 · 📷 拍照定位讲解 · 或打字提问';
+  setTimeout(greet,1500);
+}
+function onPlayFail(msg){
+  setBadge('播放失败','off'); $('overlay').style.display='flex';
+  $('reply').textContent='画面播放失败：'+msg;
+}
+
+// ── 连接：iOS 走原生 HLS，安卓走 mpegts.js FLV。均在点击手势里 play()（允许带声音）──
+function connect(){
+  $('overlay').style.display='none'; setBadge('连接中…','');
+  const v=$('video');
+  v.onwaiting=()=>setBadge('缓冲中…','');
+  v.onplaying=()=>setBadge('已连接 ●','on');
+  if(isIOS){
+    v.onerror=()=>setBadge('画面错误','off');
+    v.src=HLS; v.load();
+    v.play().then(onConnected).catch(e=>onPlayFail(e&&e.message||e));
+  }else{
+    startFlv(v);   // 安卓：动态加载播放器
+  }
+}
+function startFlv(v){
+  if(window.mpegts){ playFlv(v); return; }
+  const s=document.createElement('script');
+  s.src='/vendor/mpegts.js';
+  s.onload=()=>playFlv(v);
+  s.onerror=()=>onPlayFail('FLV 播放器加载失败');
+  document.head.appendChild(s);
+}
+function playFlv(v){
+  if(!window.mpegts||!mpegts.isSupported()){ onPlayFail('浏览器不支持 FLV(MSE)'); return; }
+  player=mpegts.createPlayer({type:'flv',url:FLV,isLive:true,enableStashBuffer:false});
+  player.attachMediaElement(v);
+  player.load();
+  player.play().then(onConnected).catch(e=>onPlayFail(e&&e.message||e));
+  player.on(mpegts.Events.ERROR,()=>setBadge('画面错误','off'));
+}
+
+// ── 主动迎宾 ──────────────────────────────────────────────────────
+let greeted=false;
+async function greet(){
+  if(greeted) return; greeted=true;
+  try{
+    const g=await (await fetch(`/rag/trip/greeting?scenic_id=${$('scenic').value}&group_type=adult`)).json();
+    if(g.text){
+      showReply(g.text);
+      $('pills').innerHTML='<span class="pill emo">主动迎宾</span>';
+      fetch('/live/say',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({sessionid,text:g.text,scenic_id:$('scenic').value,emotion:g.emotion||'happy'})}).catch(()=>{});
+    }
+  }catch(e){/* 迎宾失败不影响主流程 */}
+}
+
+// 思考态：动画三点
+function showThinking(){
+  $('reply').classList.add('thinking');
+  $('reply').innerHTML='慧昭正在思考 <span class="dots"><span></span><span></span><span></span></span>';
+}
+function showReply(t){ $('reply').classList.remove('thinking'); $('reply').textContent=t; }
+
+// 建议快问
+function quickAsk(el){ $('msg').value=el.dataset.q; ask(); }
+
+// ── 提问 → 桥接 /live/ask → 数字人开口 ────────────────────────────
+async function ask(){
+  const msg=$('msg').value.trim(); if(!msg) return;
+  if(!started){ alert('请先连接数字人'); return; }
+  $('send').disabled=true; $('pills').innerHTML=''; showThinking();
+  const t0=Date.now();
+  try{
+    const r=await fetch('/live/ask',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({sessionid,message:msg,scenic_id:$('scenic').value})});
+    const d=await r.json();
+    if(!r.ok){ showReply('出错：'+(d.detail||r.status)); return; }
+    const dt=((Date.now()-t0)/1000).toFixed(1);
+    showReply(d.reply||'(无回答)');
+    $('pills').innerHTML=`<span class="pill">意图 ${d.intent||'-'}</span>`
+      +`<span class="pill emo">情绪 ${d.emotion||'-'}</span>`
+      +`<span class="pill tm">⏱ ${dt}s</span>`;
+    $('msg').value='';
+  }catch(e){ showReply('请求失败：'+e.message); }
+  finally{ $('send').disabled=false; }
+}
+
+// ── 语音输入 + 能量 VAD 自动断句 ──────────────────────────────────
+let micState='idle', mediaStream=null, mr=null, chunks=[], audioCtx=null, rafId=null, wantTranscribe=false;
+function setMic(s){ micState=s; const b=$('mic');
+  b.className='iconbtn'+(s==='idle'?'':' '+s);
+  b.textContent = s==='recognizing' ? '⏳' : '🎤';
+}
+async function toggleVoice(){
+  if(micState!=='idle'){ stopVoice(false); return; }
+  try{
+    mediaStream=await navigator.mediaDevices.getUserMedia({audio:{noiseSuppression:true,echoCancellation:true}});
+  }catch(e){ alert('麦克风不可用（需 HTTPS 访问）：'+e.message); return; }
+  chunks=[]; wantTranscribe=false;
+  mr=new MediaRecorder(mediaStream);
+  mr.ondataavailable=e=>{ if(e.data.size) chunks.push(e.data); };
+  mr.onstop=onRecStop;
+  mr.start();
+  setMic('listening'); $('hint').textContent='请说话…（说完会自动识别）';
+
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  const src=audioCtx.createMediaStreamSource(mediaStream);
+  const an=audioCtx.createAnalyser(); an.fftSize=512; src.connect(an);
+  const buf=new Uint8Array(an.fftSize);
+  // SILENCE_HOLD 500ms 省 ~0.3s 延迟；若说话被提前打断，调回 650~800
+  const VOICE_TH=0.018, MIN_SPEECH=300, SILENCE_HOLD=500, MAX_MS=12000;
+  let spoke=false, speechStart=0, lastVoice=performance.now(), t0=performance.now();
+  function loop(){
+    if(micState==='idle') return;
+    an.getByteTimeDomainData(buf);
+    let sum=0; for(let i=0;i<buf.length;i++){ const v=(buf[i]-128)/128; sum+=v*v; }
+    const rms=Math.sqrt(sum/buf.length), now=performance.now();
+    if(rms>VOICE_TH){ lastVoice=now; if(!spoke){ spoke=true; speechStart=now; setMic('recording'); } }
+    if(spoke && (now-speechStart)>MIN_SPEECH && (now-lastVoice)>SILENCE_HOLD){ stopVoice(true); return; }
+    if((now-t0)>MAX_MS){ stopVoice(spoke); return; }
+    rafId=requestAnimationFrame(loop);
+  }
+  rafId=requestAnimationFrame(loop);
+}
+function stopVoice(transcribe){
+  wantTranscribe=transcribe;
+  if(rafId){ cancelAnimationFrame(rafId); rafId=null; }
+  if(audioCtx){ audioCtx.close().catch(()=>{}); audioCtx=null; }
+  if(mr && mr.state!=='inactive'){ mr.stop(); }
+  else { cleanupMic(); }
+}
+function cleanupMic(){ if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; } }
+async function onRecStop(){
+  cleanupMic();
+  if(!wantTranscribe || !chunks.length){ setMic('idle'); $('hint').textContent='🎤 点麦克风语音提问，或打字提问'; return; }
+  setMic('recognizing'); $('hint').textContent='识别中…';
+  const fd=new FormData();
+  fd.append('file', new Blob(chunks,{type:'audio/webm'}), 'voice.webm');
+  fd.append('scenic_id', $('scenic').value);
+  try{
+    const r=await fetch('/rag/asr',{method:'POST',body:fd});
+    const d=await r.json();
+    setMic('idle');
+    if(d.text && d.text.trim()){ $('msg').value=d.text.trim(); ask(); }
+    else { showReply('没听清，请再说一次'); $('hint').textContent='🎤 再试一次'; }
+  }catch(e){ setMic('idle'); showReply('识别失败：'+e.message); }
+}
+
+// ── 拍照视觉定位 + 口语指路 ───────────────────────────────────────
+async function onPhoto(file){
+  if(!file) return;
+  if(!started){ alert('请先连接数字人'); return; }
+  $('cam').disabled=true; $('pills').innerHTML=''; $('reply').classList.add('thinking'); $('reply').textContent='识别画面中…';
+  const t0=Date.now();
+  try{
+    const dataUrl=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file);});
+    const b64=dataUrl.slice(dataUrl.indexOf(',')+1);
+    const m=/data:image\/(\w+);/.exec(dataUrl); const fmt=m?m[1]:'jpeg';
+    const r=await fetch('/rag/chat/image',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({session_id:'talk',scenic_id:$('scenic').value,image_b64:b64,image_format:fmt,
+        question:'我面前是什么？帮我定位、讲解，并指引我接下来去哪。'})});
+    const d=await r.json();
+    if(!r.ok){ showReply('出错：'+(d.detail||r.status)); return; }
+    const dt=((Date.now()-t0)/1000).toFixed(1);
+    showReply(d.reply||'(无结果)');
+    $('pills').innerHTML=(d.location?`<span class="pill">📍 ${d.location}</span>`:`<span class="pill emo">未定位</span>`)
+      +`<span class="pill emo">情绪 ${d.emotion||'-'}</span>`+`<span class="pill tm">⏱ ${dt}s</span>`;
+    if(d.reply){ fetch('/live/say',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({sessionid,text:d.reply,scenic_id:$('scenic').value,emotion:d.emotion||'neutral'})}).catch(()=>{}); }
+  }catch(e){ showReply('识别失败：'+e.message); }
+  finally{ $('cam').disabled=false; $('camfile').value=''; }
+}
+</script>
+</body>
+</html>

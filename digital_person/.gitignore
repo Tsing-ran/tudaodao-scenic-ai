@@ -1,0 +1,77 @@
+# 环境变量（含 API Key，绝对不能提交）
+.env
+.env.*
+!.env.example
+
+# 交付：作品源码是导出产物（80M，内容本就来自各仓库），不入库；部署手册本身入库
+作品源码/
+作品源码.zip
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 向量数据库（本地生成，体积大）
+vector_store/
+
+# 会话数据库
+conversations.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+~$*
+
+# 日志
+*.log
+logs/
+
+# 临时文件
+/tmp/
+*.tar.gz
+
+# MCP 配置（含本机绝对路径 + API key，敏感不提交）
+.mcp.json
+
+# 调试/演示截图（散落在仓库根目录，不入库）
+/*.png
+/*.jpeg
+/*.jpg
+
+# Playwright MCP 缓存
+.playwright-mcp/
+
+# 前端依赖（webapp 不在本仓版本控制，但防误提交 node_modules）
+webapp/node_modules/
+# PlantUML 可下载二进制（render_diagrams.sh 会取）
+tools/plantuml.jar
+
+# BI 派生缓存（140k 行 xlsx 的 pickle，首次加载自动重建，13MB 不入库）
+示范景区公开资料包/behavior_data.pkl
+
+# 大体积形象实验/对比产物（可由 scripts/ 重新生成，不入库，避免仓库臌胀）
+assets/avatar_variants/
+assets/avatar_inscene_wanx/
+assets/avatar_compare/
+assets/avatar_outfit_inscene/
+
+# Claude Code 本机配置（权限等本地状态，不入库）
+.claude/

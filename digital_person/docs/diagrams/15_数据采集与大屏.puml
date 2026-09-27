@@ -1,0 +1,17 @@
+@startuml 15_数据采集与大屏
+!include _style.puml
+
+participant "游客端\n(手机网页)" as U
+participant "服务端" as S
+database "SQLite\nconversations / events" as DB
+participant "管理端\n(数据大屏)" as A
+
+U -> S : 问答、拍照、语音
+S -> DB : ① 自动落库 conversations\n(问、答、情绪、意图、景区、时间)
+U -> S : 行为埋点上报
+S -> DB : ② 落库 events\n(画像、功能、到访、满意度)
+A -> S : 读取聚合接口
+S -> DB : 聚合查询
+DB --> S : 统计结果
+S --> A : 聚合 JSON，渲染为大屏可视化
+@enduml

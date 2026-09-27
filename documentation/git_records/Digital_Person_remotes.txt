@@ -1,0 +1,2 @@
+origin	/root/autodl-tmp/repos/Digital_Person.git (fetch)
+origin	/root/autodl-tmp/repos/Digital_Person.git (push)

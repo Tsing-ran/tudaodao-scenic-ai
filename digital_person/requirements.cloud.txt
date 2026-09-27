@@ -1,0 +1,20 @@
+# 云端部署专用依赖（去掉本地GPU模型，改用DashScope API）
+# 不含 torch / FlagEmbedding / transformers，镜像体积从 6GB 降到 ~300MB
+
+dashscope>=1.20.0
+rank_bm25>=0.2.2
+chromadb>=0.5.0
+python-docx>=1.1.0
+openpyxl>=3.1.0
+pandas>=2.0.0
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+python-multipart>=0.0.9
+python-dotenv>=1.0.0
+opentelemetry-exporter-otlp-proto-grpc>=1.25.0
+pymupdf
+
+# 扫码接力二维码渲染（纯 Python，0 系统依赖）
+segno>=1.6.0

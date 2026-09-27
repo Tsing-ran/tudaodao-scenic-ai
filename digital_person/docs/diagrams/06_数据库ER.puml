@@ -1,0 +1,105 @@
+@startuml 06_数据库ER
+!include _style.puml
+
+package "SQLite（会话 / 行为 / 配置 / 知识 / 接力）" {
+  entity "conversations\n会话问答" as conv {
+    * id : INTEGER «PK»
+    --
+    session_id : TEXT
+    scenic_id : TEXT
+    user_message : TEXT
+    ai_reply : TEXT
+    emotion : TEXT
+    context_used : INTEGER
+    created_at : TEXT
+  }
+  entity "events\n客户端行为事件" as evt {
+    * id : INTEGER «PK»
+    --
+    session_id : TEXT
+    scenic_id : TEXT
+    type : TEXT
+    group_type : TEXT
+    lang : TEXT
+    payload : TEXT(JSON)
+    created_at : TEXT
+  }
+  entity "digital_human_config\n数字人形象配置" as dhc {
+    * scenic_id : TEXT «PK»
+    --
+    avatar_id : TEXT
+    avatar_name : TEXT
+    voice_id : TEXT
+    voice_name : TEXT
+    background_id : TEXT
+    updated_at : TEXT
+  }
+  entity "scenic_theme\n景区主题色" as theme {
+    * scenic_id : TEXT «PK»
+    --
+    name : TEXT
+    primary_color : TEXT
+    sweet_color : TEXT
+    updated_at : TEXT
+  }
+  entity "dh_background\n背景素材登记" as bg {
+    * bg_id : TEXT «PK»
+    --
+    name : TEXT
+    scenic_id : TEXT
+    source : TEXT
+    status : TEXT
+    file_path : TEXT
+    created_at : TEXT
+  }
+  entity "faq_items / text_items\n/ uploaded_docs\n管理端知识条目" as kb {
+    * id : INTEGER «PK»
+    --
+    scenic_id : TEXT
+    内容字段 : TEXT
+    status : TEXT
+    created_at : TEXT
+  }
+  entity "session_handoffs\n跨设备接力快照" as ho {
+    * token : TEXT «PK»
+    --
+    snapshot : TEXT(JSON)
+    created_at : TEXT
+    expires_at : TEXT
+  }
+  entity "kb_retrieval_config\n检索配置" as rc {
+    * scenic_id : TEXT «PK»
+    --
+    strategy : TEXT
+    top_k : INTEGER
+    threshold : REAL
+  }
+}
+
+package "ChromaDB（向量库 · 命名空间隔离）" {
+  entity "collection: scenic_{id}\n每景区一个" as coll {
+    * id : UUID «PK»
+    --
+    document : TEXT（chunk）
+    embedding : FLOAT[1024]
+    metadata.source : TEXT
+  }
+}
+
+' 隐藏边把 7 张表压成两列，避免横向铺开
+conv -[hidden]-> dhc
+dhc -[hidden]-> bg
+bg -[hidden]-> ho
+evt -[hidden]-> theme
+theme -[hidden]-> kb
+kb -[hidden]-> rc
+conv -[hidden]right-> evt
+
+conv ||..o{ evt : 同一 session_id\n关联
+conv ||..o{ ho : 快照取自\n会话历史
+dhc ||..|| coll : scenic_id\n一一对应景区
+dhc ||..o{ bg : scenic_id
+kb ||..o{ coll : 条目同步\n入向量库
+rc ||..|| coll : 检索参数\n按景区生效
+note bottom of coll : hnsw:space=cosine\n余弦相似度检索
+@enduml

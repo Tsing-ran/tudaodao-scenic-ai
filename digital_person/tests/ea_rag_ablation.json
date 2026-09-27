@@ -1,0 +1,36 @@
+{
+  "generated_at": "2026-06-11 00:19:07",
+  "n_normal": 105,
+  "n_adv": 13,
+  "n_ook": 5,
+  "results": {
+    "baseline": {
+      "normal_recall": 100.0,
+      "false_refusal": 0.0,
+      "adv_recall": 100.0,
+      "ook_refusal": 0.0,
+      "adv_miss": []
+    },
+    "+anchor": {
+      "normal_recall": 100.0,
+      "false_refusal": 0.0,
+      "adv_recall": 100.0,
+      "ook_refusal": 0.0,
+      "adv_miss": []
+    },
+    "+fusion": {
+      "normal_recall": 100.0,
+      "false_refusal": 0.0,
+      "adv_recall": 100.0,
+      "ook_refusal": 0.0,
+      "adv_miss": []
+    },
+    "EA-RAG": {
+      "normal_recall": 100.0,
+      "false_refusal": 0.0,
+      "adv_recall": 100.0,
+      "ook_refusal": 40.0,
+      "adv_miss": []
+    }
+  }
+}

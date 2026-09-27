@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>灵境·导览 — 数据大屏</title>
+<script src="/echarts.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#070b18;color:#cbd5e1;
+       min-height:100vh;padding:14px 18px;background-image:radial-gradient(1200px 600px at 50% -10%,#13224a55,transparent);}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+  header h1{font-size:20px;color:#e2e8f0;letter-spacing:1px;}
+  header h1 b{color:#38bdf8;}
+  header .spacer{flex:1;}
+  select{background:#13224a;color:#e2e8f0;border:1px solid #1e3a6b;padding:7px 10px;border-radius:8px;font-size:14px;}
+  .upd{font-size:12px;color:#64748b;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px;}
+  .kpi{background:linear-gradient(135deg,#0f1d3d,#0c1730);border:1px solid #1b2c52;border-radius:12px;padding:14px 16px;}
+  .kpi .label{font-size:13px;color:#7c93b8;}
+  .kpi .val{font-size:30px;font-weight:700;color:#38bdf8;margin-top:6px;}
+  .kpi .val small{font-size:15px;color:#94a3b8;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+  .card{background:#0b152e;border:1px solid #1b2c52;border-radius:12px;padding:12px 14px;}
+  .card h3{font-size:14px;color:#9fb3d4;margin-bottom:6px;font-weight:600;}
+  .chart{width:100%;height:240px;}
+  .crowd{background:linear-gradient(135deg,#0f1d3d,#0c1730);border:1px solid #1b2c52;border-radius:12px;padding:14px 16px;}
+  .crowd .badges{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;}
+  .badge{font-size:12px;padding:4px 10px;border-radius:20px;background:#13224a;color:#cbd5e1;}
+  .badge.season{background:#7c3aed33;color:#c4b5fd;}
+  .badge.quiet{background:#0ea5e933;color:#7dd3fc;}
+  .crowdrow{display:flex;align-items:center;gap:10px;margin:8px 0;}
+  .crowdrow .name{width:90px;font-size:13px;color:#cbd5e1;}
+  .bar{flex:1;height:18px;background:#0c1730;border-radius:9px;overflow:hidden;}
+  .bar > i{display:block;height:100%;border-radius:9px;}
+  .lv{width:48px;font-size:12px;text-align:right;}
+  .note{font-size:11px;color:#5b6b88;margin-top:8px;}
+  .empty{color:#64748b;font-size:13px;padding:10px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏯 <b>灵境·导览</b> 运营数据大屏</h1>
+  <div class="spacer"></div>
+  <select id="scenic" onchange="loadAll()">
+    <option value="lingshan">灵山胜境</option>
+    <option value="nihuawan">拈花湾</option>
+    <option value="xihu">西湖</option>
+    <option value="huangshan">黄山</option>
+    <option value="gugong">故宫</option>
+  </select>
+  <span class="upd" id="upd">—</span>
+</header>
+
+<div class="kpis">
+  <div class="kpi"><div class="label">累计问答</div><div class="val" id="k_total">—</div></div>
+  <div class="kpi"><div class="label">服务会话</div><div class="val" id="k_sess">—</div></div>
+  <div class="kpi"><div class="label">满意度</div><div class="val" id="k_sat">—</div></div>
+  <div class="kpi"><div class="label">知识命中率</div><div class="val" id="k_hit">—</div></div>
+</div>
+
+<div class="crowd">
+  <h3>🚶 实时客流热度 · 错峰分流（真实行为数据 + 时段模型）</h3>
+  <div class="badges" id="crowd_badges"></div>
+  <div id="crowd_rows"></div>
+  <div class="note" id="crowd_note"></div>
+</div>
+
+<div class="grid" style="margin-top:14px;">
+  <div class="card"><h3>😊 情绪分布</h3><div class="chart" id="c_emotion"></div></div>
+  <div class="card"><h3>📈 每日问答趋势</h3><div class="chart" id="c_daily"></div></div>
+</div>
+<div class="grid">
+  <div class="card"><h3>💗 满意度趋势</h3><div class="chart" id="c_sent"></div></div>
+  <div class="card"><h3>🔥 热门问题</h3><div class="chart" id="c_topics"></div></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const scenic=()=>$('scenic').value;
+const EMO={happy:'开心',excited:'兴奋',neutral:'平静',curious:'好奇',empathetic:'关切',apologetic:'抱歉'};
+const EMO_COLOR={happy:'#22c55e',excited:'#f59e0b',neutral:'#64748b',curious:'#38bdf8',empathetic:'#a78bfa',apologetic:'#ef4444'};
+const LV_COLOR={'空闲':'#22c55e','适中':'#38bdf8','较多':'#f59e0b','繁忙':'#ef4444'};
+const charts={};
+function ch(id){ if(!charts[id]) charts[id]=echarts.init($(id),'dark'); return charts[id]; }
+const baseGrid={left:'3%',right:'4%',bottom:'3%',top:'12%',containLabel:true};
+const DARK={backgroundColor:'transparent'};
+
+async function getJSON(u){ const r=await fetch(u); return r.json(); }
+
+async function loadAll(){
+  const s=scenic();
+  try{
+    const [dash,sent,topics,crowd]=await Promise.all([
+      getJSON(`/analytics/dashboard?scenic_id=${s}&days=30`),
+      getJSON(`/analytics/sentiment-trend?scenic_id=${s}&days=30`),
+      getJSON(`/analytics/hot-topics?scenic_id=${s}&days=30&limit=10`),
+      getJSON(`/analytics/crowd?scenic_id=${s}`),
+    ]);
+    renderKpi(dash); renderEmotion(dash); renderDaily(dash);
+    renderSent(sent); renderTopics(topics); renderCrowd(crowd);
+    $('upd').textContent='更新于 '+new Date().toLocaleTimeString();
+  }catch(e){ $('upd').textContent='加载失败：'+e.message; }
+}
+
+function renderKpi(d){
+  $('k_total').textContent=d.total_conversations??0;
+  $('k_sess').textContent=d.total_sessions??0;
+  $('k_sat').innerHTML=Math.round((d.satisfaction_rate||0)*100)+'<small>%</small>';
+  $('k_hit').innerHTML=Math.round((d.context_hit_rate||0)*100)+'<small>%</small>';
+}
+function renderEmotion(d){
+  const dist=d.emotion_distribution||{};
+  const data=Object.keys(dist).map(k=>({name:EMO[k]||k,value:dist[k],itemStyle:{color:EMO_COLOR[k]||'#64748b'}}));
+  ch('c_emotion').setOption({...DARK,tooltip:{trigger:'item'},
+    series:[{type:'pie',radius:['42%','70%'],data:data.length?data:[{name:'暂无',value:1,itemStyle:{color:'#1e293b'}}],label:{color:'#cbd5e1'}}]});
+}
+function renderDaily(d){
+  const arr=d.daily_stats||[];
+  ch('c_daily').setOption({...DARK,grid:baseGrid,tooltip:{trigger:'axis'},
+    xAxis:{type:'category',data:arr.map(x=>x.date.slice(5)),axisLabel:{color:'#7c93b8'}},
+    yAxis:{type:'value',axisLabel:{color:'#7c93b8'}},
+    series:[{name:'问答',type:'bar',data:arr.map(x=>x.conversations),itemStyle:{color:'#38bdf8',borderRadius:[4,4,0,0]}},
+            {name:'会话',type:'line',smooth:true,data:arr.map(x=>x.sessions),itemStyle:{color:'#f59e0b'}}]});
+}
+function renderSent(d){
+  const arr=d.trend||[];
+  ch('c_sent').setOption({...DARK,grid:baseGrid,tooltip:{trigger:'axis'},
+    xAxis:{type:'category',data:arr.map(x=>x.date.slice(5)),axisLabel:{color:'#7c93b8'}},
+    yAxis:{type:'value',max:1,axisLabel:{color:'#7c93b8',formatter:v=>Math.round(v*100)+'%'}},
+    series:[{name:'满意度',type:'line',smooth:true,areaStyle:{color:'#22c55e33'},data:arr.map(x=>x.happy_ratio),itemStyle:{color:'#22c55e'}}]});
+}
+function renderTopics(d){
+  const arr=(d.topics||[]).slice().reverse();
+  ch('c_topics').setOption({...DARK,grid:{...baseGrid,left:'14%'},tooltip:{trigger:'axis'},
+    xAxis:{type:'value',axisLabel:{color:'#7c93b8'}},
+    yAxis:{type:'category',data:arr,axisLabel:{color:'#cbd5e1'}},
+    series:[{type:'bar',data:arr.map((_,i)=>i+1),itemStyle:{color:'#a78bfa',borderRadius:[0,4,4,0]},label:{show:false}}]});
+}
+function renderCrowd(c){
+  const badges=$('crowd_badges'), rows=$('crowd_rows');
+  if(!c.has_data){ badges.innerHTML=''; rows.innerHTML='<div class="empty">该景区暂无客流数据</div>'; $('crowd_note').textContent=''; return; }
+  badges.innerHTML=`<span class="badge season">${c.season}</span>`
+    +`<span class="badge quiet">错峰：${c.quiet_hours}</span>`
+    +`<span class="badge">数据时刻 ${c.as_of}</span>`;
+  rows.innerHTML=c.attractions.map(a=>{
+    const pct=Math.min(100,Math.round(a.crowd_index/2*100));
+    const col=LV_COLOR[a.crowd_level]||'#64748b';
+    return `<div class="crowdrow"><span class="name">${a.attraction}</span>
+      <span class="bar"><i style="width:${pct}%;background:${col};"></i></span>
+      <span class="lv" style="color:${col}">${a.crowd_level}</span></div>`;
+  }).join('');
+  $('crowd_note').textContent=c.note;
+}
+
+window.addEventListener('resize',()=>Object.values(charts).forEach(c=>c.resize()));
+loadAll();
+setInterval(loadAll,30000);   // 30s 自动刷新
+</script>
+</body>
+</html>

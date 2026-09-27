@@ -1,0 +1,28 @@
+[
+  {
+    "id": "custom_20260713_201715",
+    "name": "灵山甜美导览专员",
+    "gender": "female",
+    "style": "现代",
+    "persona": "亲和甜美",
+    "outfit": "浅色职业装",
+    "age": "青年",
+    "fit": "AI 甜美默认 · 即时生效",
+    "preview": "/rag/digital-human/avatar-preview/custom_20260713_201715",
+    "recommended": true,
+    "custom": true
+  },
+  {
+    "id": "custom_20260713_183121",
+    "name": "灵山甜美导览",
+    "gender": "female",
+    "style": "现代",
+    "persona": "亲和甜美",
+    "outfit": "浅色职业装",
+    "age": "青年",
+    "fit": "AI 甜美默认 · 即时生效",
+    "preview": "/rag/digital-human/avatar-preview/custom_20260713_183121",
+    "recommended": true,
+    "custom": true
+  }
+]

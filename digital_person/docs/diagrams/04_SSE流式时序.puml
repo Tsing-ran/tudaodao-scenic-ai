@@ -1,0 +1,32 @@
+@startuml 04_SSE流式时序
+!include _style.puml
+
+actor 游客 as U
+participant "桥接层 :9000" as B
+participant "RAG 后端 :8000" as R
+participant "LiveTalking :8010" as L
+
+U -> B : 提问 query
+activate B
+B -> R : POST /chat (stream=SSE)
+activate R
+
+R --> B : event: intent（最早下发）
+R --> B : event: emotion
+B -> L : /human(emotion) 切表情
+note over R : LLM 流式生成，逐句切分
+
+R --> B : event: sentence #1
+B -> L : /human(句1) 立即驱动开口
+note right of L : 首句 ~1.5s 即开口\n不等整段
+R --> B : event: sentence #2
+B -> L : /human(句2) 排队播报
+R --> B : event: sentence #N
+B -> L : /human(句N)
+R --> B : event: end (full_text)
+deactivate R
+B --> U : 完成
+deactivate B
+
+L --> U : 数字人视频流（RTMP→SRS→FLV/HLS）
+@enduml

@@ -1,0 +1,24 @@
+@startuml 05_数字人推流链路
+!include _style.puml
+
+participant "桥接层 :9000" as B
+participant "LiveTalking\n(Ditto)" as L
+participant "TTS\n(Qwen-TTS)" as T
+participant "SRS 媒体服务器" as S
+participant "前端播放器\n(mpegts.js)" as P
+
+B -> L : /human(文字, 情绪, 景区)
+activate L
+L -> T : 文字 → 语音(16kHz WAV)
+T --> L : 音频
+L -> L : Ditto 全脸实时驱动\n情绪条件注入
+L -> S : 音视频 RTMP 推流\nrtmp://localhost/live/livestream
+deactivate L
+activate S
+
+P -> B : GET /stream.flv（同源，借桥接 CORS）
+B -> S : 反向代理 HTTP-FLV
+S --> B : FLV 流
+B --> P : FLV 流（带 CORS 头）
+P -> P : mpegts.js 解码播放
+@enduml

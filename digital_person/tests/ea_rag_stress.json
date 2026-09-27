@@ -1,0 +1,60 @@
+{
+  "generated_at": "2026-06-11 00:21:30",
+  "budget_stress_k3": {
+    "baseline": {
+      "normal_recall": 100.0,
+      "adv_recall": 100.0
+    },
+    "EA-RAG": {
+      "normal_recall": 100.0,
+      "adv_recall": 100.0
+    }
+  },
+  "gate_calibration": {
+    "curve": [
+      {
+        "threshold": 0.02,
+        "ook_refusal": 40.0,
+        "false_refusal": 0.0
+      },
+      {
+        "threshold": 0.05,
+        "ook_refusal": 40.0,
+        "false_refusal": 0.0
+      },
+      {
+        "threshold": 0.1,
+        "ook_refusal": 40.0,
+        "false_refusal": 0.0
+      },
+      {
+        "threshold": 0.2,
+        "ook_refusal": 60.0,
+        "false_refusal": 0.0
+      },
+      {
+        "threshold": 0.3,
+        "ook_refusal": 60.0,
+        "false_refusal": 1.0
+      },
+      {
+        "threshold": 0.5,
+        "ook_refusal": 80.0,
+        "false_refusal": 1.0
+      },
+      {
+        "threshold": 0.7,
+        "ook_refusal": 100.0,
+        "false_refusal": 1.0
+      }
+    ],
+    "normal_scores_min": 0.2985,
+    "ook_scores": [
+      0.6249,
+      0.3891,
+      0.0065,
+      0.0107,
+      0.1253
+    ]
+  }
+}

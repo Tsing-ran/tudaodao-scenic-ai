@@ -1,0 +1,59 @@
+' 共享样式：所有图 !include 此文件，保证风格统一
+' A4 五号字纪律：dpi=300 + 字号 10.5pt（=44px@300dpi，插入竖版 A4 按原生尺寸显示即为五号）。
+' 渲染后 PNG 须 ≤1890px 宽（=16cm@300dpi 文字栏宽），超宽必须改为纵向布局/拆行，否则 Word 缩放后字跌破五号。
+skinparam defaultFontName "Noto Sans CJK SC"
+skinparam defaultFontSize 16
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam dpi 300
+' 加大节点/层间距，避免连线压住文字、字被遮挡
+skinparam nodesep 50
+skinparam ranksep 65
+skinparam padding 4
+skinparam ArrowColor #34495E
+skinparam ArrowFontColor #34495E
+skinparam ArrowFontSize 15
+
+skinparam rectangle {
+  BorderColor #2E86DE
+  BackgroundColor #EAF2FB
+  FontColor #1B2631
+}
+skinparam component {
+  BorderColor #2E86DE
+  BackgroundColor #EAF2FB
+  FontColor #1B2631
+}
+skinparam package {
+  BorderColor #5D6D7E
+  BackgroundColor #F4F6F7
+  FontColor #2C3E50
+  FontStyle bold
+}
+skinparam database {
+  BorderColor #16A085
+  BackgroundColor #E8F8F5
+}
+skinparam queue {
+  BorderColor #E67E22
+  BackgroundColor #FDF2E9
+}
+skinparam actor {
+  BorderColor #8E44AD
+  BackgroundColor #F5EEF8
+}
+skinparam usecase {
+  BorderColor #2E86DE
+  BackgroundColor #EAF2FB
+}
+skinparam note {
+  BorderColor #E67E22
+  BackgroundColor #FEF9E7
+}
+skinparam sequence {
+  LifeLineBorderColor #5D6D7E
+  ParticipantBorderColor #2E86DE
+  ParticipantBackgroundColor #EAF2FB
+  ActorBorderColor #8E44AD
+}

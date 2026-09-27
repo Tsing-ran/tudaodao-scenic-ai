@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数字人后端测试面板</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2d3148;
+    --accent: #6c63ff;
+    --accent2: #00c9a7;
+    --text: #e2e8f0;
+    --muted: #718096;
+    --happy: #f6c90e;
+    --excited: #ff6b6b;
+    --neutral: #74b9ff;
+    --curious: #a29bfe;
+    --empathetic: #fd79a8;
+    --apologetic: #636e72;
+    --radius: 10px;
+    --gap: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 15px; min-height: 100vh; }
+
+  /* ── 顶栏 ── */
+  header { background: var(--card); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 17px; font-weight: 700; color: var(--text); }
+  #status-dot { width: 9px; height: 9px; border-radius: 50%; background: #888; flex-shrink: 0; transition: background .3s; }
+  #status-dot.ok  { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); }
+  #status-dot.err { background: var(--excited); }
+  #status-label { font-size: 13px; color: var(--muted); }
+  #base-input { margin-left: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; color: var(--text); font-size: 13px; width: 280px; }
+
+  /* ── 标签页 ── */
+  nav { display: flex; gap: 4px; padding: 12px 24px 0; border-bottom: 1px solid var(--border); background: var(--card); }
+  .tab-btn { padding: 8px 18px; border: none; background: none; color: var(--muted); cursor: pointer; font-size: 14px; border-bottom: 2px solid transparent; transition: all .2s; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+  /* ── 内容区 ── */
+  .tab-panel { display: none; padding: 24px; max-width: 900px; }
+  .tab-panel.active { display: block; }
+
+  /* ── 通用控件 ── */
+  .row { display: flex; gap: var(--gap); align-items: flex-end; flex-wrap: wrap; margin-bottom: var(--gap); }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  select, input[type=text], input[type=number], textarea {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--text); padding: 9px 12px; font-size: 14px; outline: none; transition: border .2s;
+  }
+  select:focus, input:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 70px; font-family: inherit; }
+  .btn { padding: 9px 20px; border: none; border-radius: var(--radius); cursor: pointer; font-size: 14px; font-weight: 600; transition: all .15s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { filter: brightness(1.15); }
+  .btn-primary:disabled { opacity: .5; cursor: default; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: transparent; color: #ff6b6b; border: 1px solid #ff6b6b44; }
+  .btn-danger:hover { background: #ff6b6b22; }
+  .toggle-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .toggle-row input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+
+  /* ── 结果卡片 ── */
+  .result-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-top: 16px; min-height: 60px; }
+  .result-box.hidden { display: none; }
+
+  /* ── 情绪徽章 ── */
+  .emotion-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+  .emotion-happy     { background: #f6c90e22; color: var(--happy);     border: 1px solid var(--happy); }
+  .emotion-excited   { background: #ff6b6b22; color: var(--excited);   border: 1px solid var(--excited); }
+  .emotion-neutral   { background: #74b9ff22; color: var(--neutral);   border: 1px solid var(--neutral); }
+  .emotion-curious   { background: #a29bfe22; color: var(--curious);   border: 1px solid var(--curious); }
+  .emotion-empathetic{ background: #fd79a822; color: var(--empathetic);border: 1px solid var(--empathetic); }
+  .emotion-apologetic{ background: #636e7222; color: var(--apologetic);border: 1px solid var(--apologetic); }
+
+  /* ── 流式句子 ── */
+  .sentence-list { display: flex; flex-direction: column; gap: 8px; }
+  .sentence-item { display: flex; align-items: flex-start; gap: 10px; animation: fadeIn .3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .sentence-text { line-height: 1.7; color: var(--text); flex: 1; }
+  .sentence-time { font-size: 11px; color: var(--muted); flex-shrink: 0; padding-top: 4px; font-variant-numeric: tabular-nums; }
+  .typing-cursor { display: inline-block; width: 2px; height: 14px; background: var(--accent); animation: blink .7s infinite; vertical-align: middle; margin-left: 2px; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* ── 键值对展示 ── */
+  .kv-row { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .kv-row:last-child { border: none; }
+  .kv-key { color: var(--muted); min-width: 120px; }
+  .kv-val { color: var(--text); }
+  .chip { display: inline-block; background: var(--accent)22; color: var(--accent); border-radius: 4px; padding: 1px 7px; font-size: 12px; margin: 1px; }
+
+  /* ── 图片上传 ── */
+  .drop-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 30px; text-align: center; color: var(--muted); cursor: pointer; transition: all .2s; }
+  .drop-zone:hover, .drop-zone.over { border-color: var(--accent); color: var(--accent); }
+  .drop-zone img { max-width: 100%; max-height: 200px; border-radius: 8px; margin-top: 12px; }
+
+  /* ── 知识库 ── */
+  .kb-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .kb-name { font-weight: 600; font-size: 14px; }
+  .kb-count { color: var(--accent2); font-variant-numeric: tabular-nums; font-size: 13px; }
+
+  /* ── 分析大屏 ── */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; text-align: center; }
+  .stat-num { font-size: 28px; font-weight: 700; color: var(--accent); }
+  .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .topic-chip { display: inline-block; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 4px 12px; font-size: 13px; margin: 3px; cursor: default; transition: border .15s; }
+  .topic-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── 历史对话 ── */
+  .conv-item { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 10px; }
+  .conv-meta { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: flex; gap: 12px; }
+  .conv-q { color: var(--accent2); margin-bottom: 4px; font-size: 13px; }
+  .conv-a { color: var(--text); font-size: 13px; line-height: 1.6; }
+
+  /* ── 多轮对话 ── */
+  .chat-history { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; max-height: 320px; overflow-y: auto; padding: 12px; background: var(--bg); border-radius: var(--radius); border: 1px solid var(--border); }
+  .bubble { max-width: 80%; padding: 10px 14px; border-radius: 12px; line-height: 1.6; font-size: 14px; }
+  .bubble.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 3px; }
+  .bubble.bot  { align-self: flex-start; background: var(--card); border: 1px solid var(--border); border-bottom-left-radius: 3px; }
+
+  /* ── 分隔线 ── */
+  hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
+  .note { font-size: 12px; color: var(--muted); padding: 8px 12px; background: var(--card); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+
+<!-- ── 顶栏 ── -->
+<header>
+  <div id="status-dot"></div>
+  <h1>数字人后端测试面板</h1>
+  <span id="status-label">检查中…</span>
+  <input id="base-input" type="text" value="" placeholder="Backend URL" title="修改后回车刷新状态">
+</header>
+
+<!-- ── 标签页导航 ── -->
+<nav>
+  <button class="tab-btn active" onclick="switchTab('stream')">⚡ 流式对话</button>
+  <button class="tab-btn" onclick="switchTab('chat')">💬 同步对话</button>
+  <button class="tab-btn" onclick="switchTab('image')">🖼 图片对话</button>
+  <button class="tab-btn" onclick="switchTab('kb')">📚 知识库</button>
+  <button class="tab-btn" onclick="switchTab('analytics')">📊 数据分析</button>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════
+     Tab 1: 流式对话
+═══════════════════════════════════════════════════════ -->
+<div id="tab-stream" class="tab-panel active">
+  <div class="note">第一个事件是 <b>emotion</b>（表情控制），后续每个自然句触发一次 <b>sentence</b>（送 TTS）。数字旁时间为首 token 起的耗时。</div>
+  <div class="row">
+    <div class="field">
+      <label>景区</label>
+      <select id="stream-scenic">
+        <option value="lingshan">灵山胜境</option>
+        <option value="nihuawan">拈花湾</option>
+        <option value="xihu">杭州西湖</option>
+        <option value="huangshan">安徽黄山</option>
+        <option value="gugong">北京故宫</option>
+      </select>
+    </div>
+    <div class="field" style="flex:1">
+      <label>问题</label>
+      <input id="stream-msg" type="text" value="灵山大佛有多高？" placeholder="输入问题…">
+    </div>
+  </div>
+  <div class="row">
+    <label class="toggle-row"><input type="checkbox" id="stream-fast"> 快速模式 (qwen-turbo)</label>
+    <button class="btn btn-primary" id="stream-btn" onclick="doStream()">发送</button>
+    <button class="btn btn-ghost" onclick="clearStream()">清除</button>
+  </div>
+
+  <div id="stream-result" class="result-box hidden">
+    <div id="stream-emotion-area"></div>
+    <div id="stream-sentences" class="sentence-list"></div>
+    <div id="stream-stats" style="margin-top:12px; font-size:12px; color:var(--muted)"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     Tab 2: 同步对话（多轮）
+═══════════════════════════════════════════════════════ -->
+<div id="tab-chat" class="tab-panel">
+  <div class="row">
+    <div class="field">
+      <label>景区</label>
+      <select id="chat-scenic">
+        <option value="lingshan">灵山胜境</option>
+        <option value="nihuawan">拈花湾</option>
+        <option value="xihu">杭州西湖</option>
+        <option value="huangshan">安徽黄山</option>
+        <option value="gugong">北京故宫</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Session ID</label>
+      <input id="chat-session" type="text" value="test-001" style="width:130px">
+    </div>
+    <label class="toggle-row"><input type="checkbox" id="chat-fast"> 快速模式</label>
+    <button class="btn btn-ghost" style="margin-left:auto" onclick="clearChat()">清除对话</button>
+  </div>
+
+  <div id="chat-history" class="chat-history" style="display:none"></div>
+
+  <div class="row">
+    <textarea id="chat-msg" placeholder="输入问题，回车发送…" style="flex:1; min-height:50px" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();doChat()}"></textarea>
+    <button class="btn btn-primary" id="chat-btn" onclick="doChat()">发送</button>
+  </div>
+
+  <div id="chat-detail" class="result-box hidden">
+    <p class="section-title">上一条详情</p>
+    <div id="chat-detail-content"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     Tab 3: 图片对话
+═══════════════════════════════════════════════════════ -->
+<div id="tab-image" class="tab-panel">
+  <div class="note">使用 <b>qwen-vl-max-latest</b> 多模态模型。上传景区照片，用 AI 导游身份回答问题。</div>
+  <div class="row">
+    <div class="field">
+      <label>景区（人格设定）</label>
+      <select id="img-scenic">
+        <option value="lingshan">灵山胜境</option>
+        <option value="nihuawan">拈花湾</option>
+        <option value="xihu">杭州西湖</option>
+        <option value="huangshan">安徽黄山</option>
+        <option value="gugong">北京故宫</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="drop-zone" class="drop-zone" onclick="document.getElementById('img-file').click()"
+       ondragover="event.preventDefault();this.classList.add('over')"
+       ondragleave="this.classList.remove('over')"
+       ondrop="handleDrop(event)">
+    <p>点击或拖拽图片到此处</p>
+    <p style="font-size:12px;margin-top:4px">支持 JPG / PNG / WEBP</p>
+    <img id="img-preview" style="display:none">
+  </div>
+  <input type="file" id="img-file" accept="image/*" style="display:none" onchange="handleFileSelect(this)">
+
+  <div class="row" style="margin-top:16px">
+    <div class="field" style="flex:1">
+      <label>问题</label>
+      <input id="img-question" type="text" value="这是什么地方？有什么历史意义？">
+    </div>
+    <button class="btn btn-primary" id="img-btn" onclick="doImageChat()">发送</button>
+  </div>
+
+  <div id="img-result" class="result-box hidden"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     Tab 4: 知识库管理
+═══════════════════════════════════════════════════════ -->
+<div id="tab-kb" class="tab-panel">
+  <div class="row" style="justify-content:space-between;align-items:center">
+    <p class="section-title" style="margin:0">当前知识库</p>
+    <button class="btn btn-ghost" onclick="loadKB()">刷新</button>
+  </div>
+  <div id="kb-list">加载中…</div>
+
+  <hr>
+  <p class="section-title">上传文档</p>
+  <div class="row">
+    <div class="field">
+      <label>景区 ID</label>
+      <input id="kb-scenic" type="text" value="lingshan" style="width:130px">
+    </div>
+    <label class="toggle-row"><input type="checkbox" id="kb-replace"> 先清空再入库</label>
+  </div>
+  <div class="row">
+    <input type="file" id="kb-files" multiple accept=".docx" style="color:var(--text); font-size:13px">
+    <button class="btn btn-primary" onclick="uploadKB()">上传并入库</button>
+  </div>
+  <div id="kb-upload-result" class="result-box hidden"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     Tab 5: 数据分析
+═══════════════════════════════════════════════════════ -->
+<div id="tab-analytics" class="tab-panel">
+  <div class="row">
+    <div class="field">
+      <label>景区</label>
+      <select id="anal-scenic" onchange="loadAnalytics()">
+        <option value="lingshan">灵山胜境</option>
+        <option value="nihuawan">拈花湾</option>
+        <option value="xihu">杭州西湖</option>
+        <option value="huangshan">安徽黄山</option>
+        <option value="gugong">北京故宫</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>近 N 天</label>
+      <input id="anal-days" type="number" value="30" min="1" max="365" style="width:80px" onchange="loadAnalytics()">
+    </div>
+    <button class="btn btn-ghost" onclick="loadAnalytics()">刷新</button>
+    <button class="btn btn-ghost" onclick="loadReport()" id="report-btn">生成 AI 报告</button>
+  </div>
+
+  <div id="anal-stats" class="stat-grid"></div>
+
+  <div class="row" style="gap:24px;align-items:flex-start">
+    <div style="flex:1">
+      <p class="section-title">热门话题</p>
+      <div id="anal-topics"></div>
+    </div>
+    <div style="flex:1">
+      <p class="section-title">情绪分布</p>
+      <div id="anal-emotions"></div>
+    </div>
+  </div>
+
+  <hr>
+  <p class="section-title">最近对话记录</p>
+  <div id="anal-convs"></div>
+
+  <div id="anal-report" class="result-box hidden" style="margin-top:16px; white-space:pre-wrap; line-height:1.7"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<script>
+// 自动检测 Base URL：
+// - 从后端访问（http/https）→ 用当前页面的 origin（同源，无 CORS 问题）
+// - 从本地文件 file:// 打开   → 用默认云端地址
+const _autoBase = (() => {
+  if (location.protocol === 'http:' || location.protocol === 'https:') {
+    return location.origin;
+  }
+  return 'http://116.62.136.211:8000';
+})();
+document.getElementById('base-input').value = _autoBase;
+let BASE = _autoBase;
+
+document.getElementById('base-input').addEventListener('change', e => {
+  BASE = e.target.value.replace(/\/$/, '');
+  checkHealth();
+});
+document.getElementById('base-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { BASE = e.target.value.replace(/\/$/, ''); checkHealth(); }
+});
+
+// ── 情绪映射 ──
+const EMOTIONS = {
+  happy:      { label: '开心',   emoji: '😊' },
+  excited:    { label: '兴奋',   emoji: '🤩' },
+  neutral:    { label: '平静',   emoji: '😐' },
+  curious:    { label: '好奇',   emoji: '🤔' },
+  empathetic: { label: '关切',   emoji: '🥺' },
+  apologetic: { label: '抱歉',   emoji: '😔' },
+};
+
+function emotionBadge(value) {
+  const e = EMOTIONS[value] || { label: value, emoji: '❓' };
+  return `<span class="emotion-badge emotion-${value}">${e.emoji} ${e.label}</span>`;
+}
+
+// ── 标签页切换 ──
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'kb') loadKB();
+  if (name === 'analytics') loadAnalytics();
+}
+
+// ── 健康检查 ──
+async function checkHealth() {
+  const dot = document.getElementById('status-dot');
+  const lbl = document.getElementById('status-label');
+  dot.className = '';
+  lbl.textContent = '检查中…';
+  try {
+    const r = await fetch(BASE + '/health');
+    const d = await r.json();
+    if (d.status === 'ok') {
+      dot.className = 'ok'; lbl.textContent = '服务正常';
+    } else throw new Error();
+  } catch {
+    dot.className = 'err'; lbl.textContent = '无法连接';
+  }
+}
+checkHealth();
+
+// ════════════════════════════════════
+// Tab 1：流式对话
+// ════════════════════════════════════
+let streamT0 = 0;
+
+async function doStream() {
+  const msg = document.getElementById('stream-msg').value.trim();
+  if (!msg) return;
+  const scenic = document.getElementById('stream-scenic').value;
+  const fast = document.getElementById('stream-fast').checked;
+  const btn = document.getElementById('stream-btn');
+
+  btn.disabled = true; btn.textContent = '接收中…';
+  const box = document.getElementById('stream-result');
+  const emotionArea = document.getElementById('stream-emotion-area');
+  const sentList = document.getElementById('stream-sentences');
+  const statsDiv = document.getElementById('stream-stats');
+
+  box.classList.remove('hidden');
+  emotionArea.innerHTML = '<span style="color:var(--muted);font-size:13px">等待情绪信号…</span>';
+  sentList.innerHTML = '';
+  statsDiv.textContent = '';
+  streamT0 = Date.now();
+  let sentCount = 0;
+
+  // 显示光标
+  const cursor = document.createElement('div');
+  cursor.className = 'sentence-item';
+  cursor.innerHTML = '<span class="typing-cursor"></span>';
+  sentList.appendChild(cursor);
+
+  try {
+    const response = await fetch(BASE + '/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, scenic_id: scenic, session_id: 'ui-test', fast, stream: true }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+    }
+    if (!response.body) {
+      throw new Error('浏览器不支持 Response.body 流式读取，请用 Chrome/Edge 最新版');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '', currentEvent = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n');
+      buffer = parts.pop();
+
+      for (const line of parts) {
+        if (line.startsWith('event: ')) {
+          currentEvent = line.slice(7).trim();
+        } else if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            const t = ((Date.now() - streamT0) / 1000).toFixed(2);
+
+            if (currentEvent === 'emotion') {
+              emotionArea.innerHTML = emotionBadge(data.value)
+                + `<span style="font-size:11px;color:var(--muted);margin-left:8px">↑ +${t}s</span>`;
+            } else if (currentEvent === 'sentence') {
+              sentCount++;
+              cursor.remove();
+              const item = document.createElement('div');
+              item.className = 'sentence-item';
+              item.innerHTML = `<span class="sentence-text">${data.text}</span><span class="sentence-time">+${t}s</span>`;
+              sentList.appendChild(item);
+              sentList.appendChild(cursor);
+            } else if (currentEvent === 'end') {
+              cursor.remove();
+              const total = ((Date.now() - streamT0) / 1000).toFixed(2);
+              statsDiv.textContent = `共 ${sentCount} 句 · 总耗时 ${total}s`;
+            }
+          } catch {}
+          currentEvent = '';
+        }
+      }
+    }
+  } catch (e) {
+    cursor.remove();
+    const isCors = e.message.includes('Failed to fetch') || e.message.includes('input stream');
+    sentList.innerHTML = `
+      <p style="color:var(--excited);margin-bottom:8px">❌ ${e.message}</p>
+      ${isCors ? `<p style="font-size:12px;color:var(--muted)">
+        可能是跨域问题（页面从 file:// 打开）。<br>
+        请改用：<b><a href="${BASE}/test" target="_blank" style="color:var(--accent)">${BASE}/test</a></b> 访问测试面板。
+      </p>` : ''}
+    `;
+  } finally {
+    btn.disabled = false; btn.textContent = '发送';
+  }
+}
+
+function clearStream() {
+  document.getElementById('stream-result').classList.add('hidden');
+}
+
+// ════════════════════════════════════
+// Tab 2：同步多轮对话
+// ════════════════════════════════════
+let chatHistory = [];
+
+async function doChat() {
+  const msg = document.getElementById('chat-msg').value.trim();
+  if (!msg) return;
+  const scenic = document.getElementById('chat-scenic').value;
+  const session = document.getElementById('chat-session').value || 'test-001';
+  const fast = document.getElementById('chat-fast').checked;
+  const btn = document.getElementById('chat-btn');
+
+  // 显示用户气泡
+  const histDiv = document.getElementById('chat-history');
+  histDiv.style.display = 'flex';
+  const userBubble = document.createElement('div');
+  userBubble.className = 'bubble user'; userBubble.textContent = msg;
+  histDiv.appendChild(userBubble);
+  histDiv.scrollTop = histDiv.scrollHeight;
+
+  // 等待气泡
+  const waitBubble = document.createElement('div');
+  waitBubble.className = 'bubble bot'; waitBubble.textContent = '…';
+  histDiv.appendChild(waitBubble);
+
+  document.getElementById('chat-msg').value = '';
+  btn.disabled = true; btn.textContent = '发送中…';
+
+  try {
+    const t0 = Date.now();
+    const r = await fetch(BASE + '/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, scenic_id: scenic, session_id: session, fast, history: chatHistory }),
+    });
+    const d = await r.json();
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(2);
+
+    chatHistory.push({ role: 'user', content: msg });
+    chatHistory.push({ role: 'assistant', content: d.reply });
+    if (chatHistory.length > 10) chatHistory = chatHistory.slice(-10);
+
+    waitBubble.innerHTML = d.reply + `<br><span style="font-size:11px;color:var(--muted)">${emotionBadge(d.emotion)} · ${elapsed}s${d.from_cache ? ' · 缓存命中' : ''}</span>`;
+    histDiv.scrollTop = histDiv.scrollHeight;
+
+    // 详情
+    const detail = document.getElementById('chat-detail');
+    detail.classList.remove('hidden');
+    document.getElementById('chat-detail-content').innerHTML = `
+      <div class="kv-row"><span class="kv-key">情绪</span><span class="kv-val">${emotionBadge(d.emotion)}</span></div>
+      <div class="kv-row"><span class="kv-key">知识库命中</span><span class="kv-val">${d.context_used ? '✅ 是' : '❌ 否'}</span></div>
+      <div class="kv-row"><span class="kv-key">缓存</span><span class="kv-val">${d.from_cache ? '✅ 命中' : '未命中'}</span></div>
+      <div class="kv-row"><span class="kv-key">来源</span><span class="kv-val">${(d.sources||[]).map(s=>`<span class="chip">${s}</span>`).join('')||'—'}</span></div>
+      <div class="kv-row"><span class="kv-key">耗时</span><span class="kv-val">${elapsed}s</span></div>
+    `;
+  } catch (e) {
+    waitBubble.textContent = `请求失败：${e.message}`;
+    waitBubble.style.color = 'var(--excited)';
+  } finally {
+    btn.disabled = false; btn.textContent = '发送';
+  }
+}
+
+function clearChat() {
+  chatHistory = [];
+  const h = document.getElementById('chat-history');
+  h.innerHTML = ''; h.style.display = 'none';
+  document.getElementById('chat-detail').classList.add('hidden');
+}
+
+// ════════════════════════════════════
+// Tab 3：图片对话
+// ════════════════════════════════════
+let imgB64 = '', imgFormat = 'jpeg';
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('over');
+  const file = e.dataTransfer.files[0];
+  if (file) loadImage(file);
+}
+
+function handleFileSelect(input) {
+  if (input.files[0]) loadImage(input.files[0]);
+}
+
+function loadImage(file) {
+  imgFormat = file.type.includes('png') ? 'png' : file.type.includes('webp') ? 'webp' : 'jpeg';
+  const reader = new FileReader();
+  reader.onload = e => {
+    imgB64 = e.target.result.split(',')[1];
+    const preview = document.getElementById('img-preview');
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    document.querySelector('#drop-zone p').textContent = file.name;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function doImageChat() {
+  if (!imgB64) { alert('请先选择图片'); return; }
+  const question = document.getElementById('img-question').value.trim();
+  const scenic = document.getElementById('img-scenic').value;
+  const btn = document.getElementById('img-btn');
+  const result = document.getElementById('img-result');
+
+  btn.disabled = true; btn.textContent = '分析中…';
+  result.classList.remove('hidden');
+  result.innerHTML = '<span style="color:var(--muted)">正在调用 qwen-vl-max-latest…</span>';
+
+  try {
+    const t0 = Date.now();
+    const r = await fetch(BASE + '/chat/image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_b64: imgB64, question, scenic_id: scenic, image_format: imgFormat, session_id: 'ui-test' }),
+    });
+    const d = await r.json();
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(2);
+
+    result.innerHTML = `
+      ${emotionBadge(d.emotion)}
+      <p style="line-height:1.7;margin-top:8px">${d.reply}</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px">模型：${d.model_used} · 耗时 ${elapsed}s</p>
+    `;
+  } catch (e) {
+    result.innerHTML = `<p style="color:var(--excited)">请求失败：${e.message}</p>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '发送';
+  }
+}
+
+// ════════════════════════════════════
+// Tab 4：知识库
+// ════════════════════════════════════
+async function loadKB() {
+  const div = document.getElementById('kb-list');
+  div.textContent = '加载中…';
+  try {
+    const r = await fetch(BASE + '/kb/list');
+    const d = await r.json();
+    const scenicNames = { lingshan:'灵山胜境', nihuawan:'拈花湾', xihu:'西湖', huangshan:'黄山', gugong:'故宫' };
+    div.innerHTML = Object.entries(d).map(([k, v]) =>
+      `<div class="kb-card">
+        <div>
+          <div class="kb-name">${scenicNames[k] || k}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">scenic_id: ${k}</div>
+        </div>
+        <div class="kb-count">${v} chunks</div>
+      </div>`
+    ).join('') || '<p style="color:var(--muted)">暂无知识库</p>';
+  } catch (e) {
+    div.textContent = '加载失败：' + e.message;
+  }
+}
+
+async function uploadKB() {
+  const scenicId = document.getElementById('kb-scenic').value.trim();
+  const replace = document.getElementById('kb-replace').checked;
+  const files = document.getElementById('kb-files').files;
+  if (!scenicId || !files.length) { alert('请填写景区 ID 并选择文件'); return; }
+
+  const form = new FormData();
+  form.append('scenic_id', scenicId);
+  form.append('replace', replace);
+  for (const f of files) form.append('files', f);
+
+  const result = document.getElementById('kb-upload-result');
+  result.classList.remove('hidden');
+  result.textContent = '上传入库中，请稍候…';
+
+  try {
+    const r = await fetch(BASE + '/kb/upload', { method: 'POST', body: form });
+    const d = await r.json();
+    result.innerHTML = `✅ 入库完成 <b>${d.chunks_indexed}</b> 个 chunk（${d.files} 个文件）`;
+    loadKB();
+  } catch (e) {
+    result.innerHTML = `<span style="color:var(--excited)">失败：${e.message}</span>`;
+  }
+}
+
+// ════════════════════════════════════
+// Tab 5：数据分析
+// ════════════════════════════════════
+async function loadAnalytics() {
+  const scenic = document.getElementById('anal-scenic').value;
+  const days = document.getElementById('anal-days').value;
+
+  try {
+    const [dash, topics, convs] = await Promise.all([
+      fetch(`${BASE}/analytics/dashboard?scenic_id=${scenic}&days=${days}`).then(r=>r.json()),
+      fetch(`${BASE}/analytics/hot-topics?scenic_id=${scenic}&days=${days}&limit=15`).then(r=>r.json()),
+      fetch(`${BASE}/analytics/conversations?scenic_id=${scenic}&days=${days}&limit=10`).then(r=>r.json()),
+    ]);
+
+    // 统计卡片
+    document.getElementById('anal-stats').innerHTML = [
+      { num: dash.total_conversations, label: '总对话数' },
+      { num: dash.total_sessions, label: '独立用户数' },
+      { num: (dash.satisfaction_rate * 100).toFixed(1) + '%', label: '正向情绪率' },
+      { num: (dash.context_hit_rate * 100).toFixed(1) + '%', label: '知识库命中率' },
+    ].map(s => `<div class="stat-card"><div class="stat-num">${s.num}</div><div class="stat-label">${s.label}</div></div>`).join('');
+
+    // 热门话题
+    document.getElementById('anal-topics').innerHTML = topics.topics.length
+      ? topics.topics.map(t => `<span class="topic-chip">${t}</span>`).join('')
+      : '<span style="color:var(--muted);font-size:13px">暂无数据</span>';
+
+    // 情绪分布
+    const EMOTION_LABELS = { happy:'开心', excited:'兴奋', neutral:'平静', curious:'好奇', empathetic:'关切', apologetic:'抱歉' };
+    const emoHtml = Object.entries(dash.emotion_distribution).sort((a,b)=>b[1]-a[1]).map(([k,v]) => {
+      const pct = dash.total_conversations ? Math.round(v / dash.total_conversations * 100) : 0;
+      const e = EMOTIONS[k] || { emoji: '❓', label: k };
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="width:60px;font-size:13px">${e.emoji} ${e.label}</span>
+        <div style="flex:1;height:8px;background:var(--border);border-radius:4px">
+          <div style="width:${pct}%;height:100%;background:var(--accent);border-radius:4px;transition:width .4s"></div>
+        </div>
+        <span style="font-size:12px;color:var(--muted);width:40px;text-align:right">${v} (${pct}%)</span>
+      </div>`;
+    }).join('');
+    document.getElementById('anal-emotions').innerHTML = emoHtml || '<span style="color:var(--muted);font-size:13px">暂无数据</span>';
+
+    // 近期对话
+    document.getElementById('anal-convs').innerHTML = convs.items.length
+      ? convs.items.map(c => `<div class="conv-item">
+          <div class="conv-meta">
+            <span>${c.created_at}</span>
+            <span>session: ${c.session_id}</span>
+            ${emotionBadge(c.emotion)}
+          </div>
+          <div class="conv-q">游客：${c.user_message}</div>
+          <div class="conv-a">导游：${c.ai_reply.slice(0, 120)}${c.ai_reply.length > 120 ? '…' : ''}</div>
+        </div>`).join('')
+      : '<p style="color:var(--muted)">暂无对话记录</p>';
+
+    document.getElementById('anal-report').classList.add('hidden');
+
+  } catch (e) {
+    document.getElementById('anal-stats').innerHTML = `<p style="color:var(--excited)">加载失败：${e.message}</p>`;
+  }
+}
+
+async function loadReport() {
+  const scenic = document.getElementById('anal-scenic').value;
+  const days = document.getElementById('anal-days').value;
+  const btn = document.getElementById('report-btn');
+  const box = document.getElementById('anal-report');
+
+  btn.disabled = true; btn.textContent = 'AI 生成中…';
+  box.classList.remove('hidden');
+  box.textContent = '正在调用 LLM 生成报告，约需 5-10 秒…';
+
+  try {
+    const r = await fetch(BASE + '/analytics/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenic_id: scenic, days: parseInt(days) }),
+    });
+    const d = await r.json();
+    box.textContent = d.report;
+  } catch (e) {
+    box.textContent = '生成失败：' + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = '生成 AI 报告';
+  }
+}
+</script>
+</body>
+</html>

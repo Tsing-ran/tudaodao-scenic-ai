@@ -1,0 +1,20 @@
+@startuml 12_句子级流式驱动
+!include _style.puml
+
+participant "RAG 后端" as R
+participant "桥接层" as B
+participant "数字人" as L
+
+R -> R : LLM 逐 token 生成
+R -> R : 凑满第一句（遇句号）
+R -> B : sentence 事件（句 1）
+B -> L : 立即驱动开口（首句携打断标志）
+note right of L : 首句约 2s 即开口，不等整段
+R -> R : 继续生成第二句……
+R -> B : sentence 事件（句 2）
+B -> L : 排队播报
+R -> B : sentence 事件（句 N）
+B -> L : 接着说
+R -> B : end
+note over R, L : 感知延迟 = 首句生成时间，与答案总长度解耦
+@enduml

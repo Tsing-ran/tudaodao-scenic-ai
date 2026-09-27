@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<!-- 图：系统总体架构（分层带状 · Visio 风格）。源文件。
+     渲染：Playwright 视口宽≈2320 → 截图 .figure → 01_系统总体架构.png
+     A4 五号：body 60px；文档 {width=round(渲染宽/2880*100)%}。越界自检 scrollWidth<=clientWidth。
+     对齐：CSS Grid template-areas 锚定，①②⑤全宽带，③④两列，DashScope 紧邻③左侧（虚线不跨④）。 -->
+<html lang="zh"><head><meta charset="utf-8"><style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:#fff;font-family:"Noto Sans CJK SC","Source Han Sans SC",sans-serif;}
+  .figure{width:2320px;padding:50px;background:#fff;}
+  .grid{display:grid;grid-template-columns:560px 96px 1fr 1fr;
+    grid-template-areas:
+      "l1 l1 l1 l1"
+      "a1 a1 a1 a1"
+      "l2 l2 l2 l2"
+      ".  .  s3 s4"
+      "cl ar l3 l4"
+      ".  .  t3 t4"
+      "l5 l5 l5 l5";
+    column-gap:30px;row-gap:0;align-items:stretch;}
+  .layer{border-radius:18px;border:3px solid var(--c);background:var(--tint);
+    box-shadow:5px 8px 14px rgba(60,70,85,0.24);overflow:hidden;display:flex;}
+  .lhead{flex:0 0 auto;background:var(--c);color:#fff;display:flex;flex-direction:column;
+    justify-content:center;align-items:center;text-align:center;padding:26px 22px;min-width:300px;}
+  .lnum{font-size:62px;font-weight:700;line-height:1.0;}
+  .lname{font-size:56px;font-weight:700;line-height:1.18;margin-top:8px;white-space:nowrap;}
+  .lbody{flex:1 1 0;min-width:0;display:flex;flex-direction:column;justify-content:center;
+    gap:12px;padding:28px 34px;}
+  .lline{font-size:60px;color:#222834;line-height:1.36;white-space:nowrap;}
+  /* ③④ 竖排卡：色头在顶 */
+  .col{flex-direction:column;}
+  .col .lhead{flex-direction:row;gap:18px;min-width:0;padding:20px;}
+  .col .lnum{font-size:54px;} .col .lname{font-size:54px;margin-top:0;}
+  /* 外部云 */
+  .ext{border-style:dashed;border-color:#7a8595;background:#f7f9fb;box-shadow:none;flex-direction:column;}
+  .ext .lhead{background:#7a8595;flex-direction:row;gap:16px;min-width:0;padding:18px;}
+  .ext .lnum{font-size:50px;} .ext .lname{font-size:50px;margin-top:0;}
+  .ext .lline{font-size:54px;}
+  .ext .cap{font-size:46px;color:#6b7686;line-height:1.3;margin-top:6px;white-space:nowrap;}
+  /* 箭头格 */
+  .ar{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:16px 0;}
+  .ar .lbl{font-size:48px;color:#46505e;font-weight:700;text-align:center;line-height:1.2;}
+  .area-l1{grid-area:l1;} .area-a1{grid-area:a1;} .area-l2{grid-area:l2;}
+  .area-s3{grid-area:s3;} .area-s4{grid-area:s4;}
+  .area-cl{grid-area:cl;} .area-ar{grid-area:ar;}
+  .area-l3{grid-area:l3;} .area-l4{grid-area:l4;}
+  .area-t3{grid-area:t3;} .area-t4{grid-area:t4;} .area-l5{grid-area:l5;}
+  .chan{grid-area:ar;display:flex;align-items:center;justify-content:center;}
+</style></head><body>
+<div class="figure"><div class="grid">
+
+  <div class="layer area-l1" style="--c:#2e86de;--tint:#eaf2fb;">
+    <div class="lhead"><div class="lnum">①</div><div class="lname">游客端</div></div>
+    <div class="lbody">
+      <div class="lline">手机网页 webapp（iOS HLS / 安卓 FLV）</div>
+      <div class="lline">安卓 APK（规划）· 大屏立屏</div></div>
+  </div>
+
+  <div class="ar area-a1"><svg width="58" height="62"><line x1="29" y1="2" x2="29" y2="40" stroke="#5a6473" stroke-width="6"/><polygon points="29,60 17,38 41,38" fill="#5a6473"/></svg><span class="lbl">提问（REST / SSE）</span></div>
+
+  <div class="layer area-l2" style="--c:#3867c4;--tint:#eaf0fb;">
+    <div class="lhead"><div class="lnum">②</div><div class="lname">接入层</div></div>
+    <div class="lbody">
+      <div class="lline">桥接层 Bridge :9000</div>
+      <div class="lline">统一入口 · 串联 RAG 与渲染 · 反向代理</div></div>
+  </div>
+
+  <div class="ar area-s3"><svg width="54" height="58"><line x1="27" y1="2" x2="27" y2="37" stroke="#5a6473" stroke-width="6"/><polygon points="27,56 16,35 38,35" fill="#5a6473"/></svg><span class="lbl">检索与生成</span></div>
+  <div class="ar area-s4"><svg width="54" height="58"><line x1="27" y1="2" x2="27" y2="37" stroke="#5a6473" stroke-width="6"/><polygon points="27,56 16,35 38,35" fill="#5a6473"/></svg><span class="lbl">逐句文字驱动</span></div>
+
+  <div class="ext layer area-cl">
+    <div class="lhead"><div class="lnum">☁</div><div class="lname">阿里云 DashScope</div></div>
+    <div class="lbody">
+      <div class="lline">qwen-plus / flash</div>
+      <div class="lline">qwen3-vl-plus</div>
+      <div class="lline">向量嵌入</div>
+      <div class="cap">生成 · 嵌入 · 视觉</div></div>
+  </div>
+
+  <div class="chan"><svg width="92" height="48"><line x1="90" y1="24" x2="26" y2="24" stroke="#7a8595" stroke-width="5" stroke-dasharray="11,9"/><polygon points="4,24 26,13 26,35" fill="#7a8595"/></svg></div>
+
+  <div class="layer col area-l3" style="--c:#16a085;--tint:#e8f8f5;">
+    <div class="lhead"><div class="lnum">③</div><div class="lname">应用层</div></div>
+    <div class="lbody">
+      <div class="lline">RAG 引擎 :8000</div>
+      <div class="lline">多智能体 Orchestrator</div>
+      <div class="lline">混合检索与重排</div>
+      <div class="lline">情境感知 · 视觉定位</div>
+      <div class="lline">行程关怀</div></div>
+  </div>
+  <div class="layer col area-l4" style="--c:#8e44ad;--tint:#f3ecf8;">
+    <div class="lhead"><div class="lnum">④</div><div class="lname">渲染层</div></div>
+    <div class="lbody">
+      <div class="lline">LiveTalking :8010</div>
+      <div class="lline">Ditto 全脸实时驱动</div>
+      <div class="lline">情绪条件 · Qwen-TTS</div>
+      <div class="lline">faster-whisper 识别</div></div>
+  </div>
+
+  <div class="ar area-t3"><svg width="54" height="58"><line x1="27" y1="2" x2="27" y2="37" stroke="#5a6473" stroke-width="6"/><polygon points="27,56 16,35 38,35" fill="#5a6473"/></svg><span class="lbl">检索 / 落库</span></div>
+  <div class="ar area-t4"><svg width="54" height="58"><line x1="27" y1="2" x2="27" y2="37" stroke="#5a6473" stroke-width="6"/><polygon points="27,56 16,35 38,35" fill="#5a6473"/></svg><span class="lbl">配置读取</span></div>
+
+  <div class="layer area-l5" style="--c:#1f9b6c;--tint:#e6f7ef;">
+    <div class="lhead"><div class="lnum">⑤</div><div class="lname">数据层</div></div>
+    <div class="lbody">
+      <div class="lline">ChromaDB（多景区命名空间隔离）· SQLite（会话、事件、配置）</div>
+      <div class="lline">行为数据集</div></div>
+  </div>
+
+</div></div></body></html>

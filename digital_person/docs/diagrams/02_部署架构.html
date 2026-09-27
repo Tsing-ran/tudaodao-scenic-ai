@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<!-- 图：部署架构（节点容器 · Visio 风格）。源文件。渲染宽≈2240 → {width≈78%}。 -->
+<html lang="zh"><head><meta charset="utf-8"><link rel="stylesheet" href="_kit.css">
+<style>
+  .fig{width:2240px;}
+  .col{display:flex;flex-direction:column;align-items:center;}
+  /* 节点容器：顶部节点名色条 + 内嵌组件 */
+  .cont{border-radius:18px;border:3px solid var(--c);background:var(--tint);
+    box-shadow:5px 8px 14px rgba(60,70,85,0.24);overflow:hidden;}
+  .cont .top{background:var(--c);color:#fff;font-size:52px;font-weight:700;
+    padding:16px 26px;text-align:center;white-space:nowrap;}
+  .cont .in{display:flex;gap:22px;padding:26px;justify-content:center;}
+  /* 内嵌组件卡 */
+  .comp{flex:1 1 0;min-width:0;background:#fff;border:3px solid var(--cc,#9aa6b4);border-radius:12px;
+    padding:20px 22px;display:flex;flex-direction:column;gap:6px;align-items:center;text-align:center;}
+  .comp .ct{font-size:50px;font-weight:700;color:#222834;white-space:nowrap;}
+  .comp .cs{font-size:42px;color:#5b6675;white-space:nowrap;}
+  /* 双向箭头排 */
+  .twa{display:flex;gap:120px;justify-content:center;align-items:center;padding:14px 0;}
+  .twa .one{display:flex;flex-direction:column;align-items:center;gap:8px;}
+  .twa .lbl{font-size:46px;font-weight:700;color:#46505e;white-space:nowrap;}
+  .row2{display:flex;gap:40px;justify-content:center;align-items:stretch;width:100%;}
+  .ext{border-style:dashed;border-color:#7a8595;background:#f7f9fb;box-shadow:none;}
+  .ext .top{background:#7a8595;}
+  .w70{width:70%;} .grow{flex:1 1 0;}
+  .albl2{font-size:46px;font-weight:700;color:#46505e;white-space:nowrap;}
+</style></head><body>
+<div class="fig"><div class="col">
+
+  <div class="cont c-blue w70" style="--c:#2e86de;--tint:#eaf2fb;">
+    <div class="top">手机端（同 WiFi 或公网 HTTPS 网关）</div>
+    <div class="in"><div class="comp" style="--cc:#2e86de;"><div class="ct">手机浏览器</div><div class="cs">iOS HLS / 安卓 FLV</div></div></div>
+  </div>
+
+  <div class="twa">
+    <div class="one"><svg width="50" height="56"><line x1="25" y1="2" x2="25" y2="36" stroke="#5a6473" stroke-width="6"/><polygon points="25,56 14,34 36,34" fill="#5a6473"/></svg><span class="lbl">提问</span></div>
+    <div class="one"><svg width="50" height="56"><line x1="25" y1="54" x2="25" y2="20" stroke="#5a6473" stroke-width="6"/><polygon points="25,0 14,22 36,22" fill="#5a6473"/></svg><span class="lbl">数字人视频流</span></div>
+  </div>
+
+  <div class="cont c-teal" style="--c:#16a085;--tint:#e8f8f5;width:100%;">
+    <div class="top">GPU 主机（本地演示 / 云端 GPU 节点）</div>
+    <div class="in">
+      <div class="comp" style="--cc:#3867c4;"><div class="ct">桥接层</div><div class="cs">统一入口</div></div>
+      <div class="comp" style="--cc:#16a085;"><div class="ct">RAG 后端</div><div class="cs">云端嵌入 · 0 显存</div></div>
+      <div class="comp" style="--cc:#8e44ad;"><div class="ct">LiveTalking + Ditto</div><div class="cs">全脸实时驱动</div></div>
+      <div class="comp" style="--cc:#e67e22;"><div class="ct">SRS 媒体服务器</div><div class="cs">RTMP / FLV / HLS</div></div>
+    </div>
+  </div>
+
+  <div class="adown" style="padding:16px 0;"><svg width="56" height="60"><line x1="28" y1="2" x2="28" y2="38" stroke="#7a8595" stroke-width="5" stroke-dasharray="11,9"/><polygon points="28,58 16,36 40,36" fill="#7a8595"/></svg><span class="albl2">调用：问答 / 嵌入 / 语音合成</span></div>
+
+  <div class="row2">
+    <div class="cont ext grow"><div class="top">云端大模型与嵌入服务</div>
+      <div class="in"><div class="comp" style="--cc:#7a8595;"><div class="ct">问答 / 嵌入 / 语音合成</div><div class="cs">DashScope · qwen 系列</div></div></div></div>
+    <div class="cont ext grow"><div class="top">无卡云服务器（可选拆分）</div>
+      <div class="in"><div class="comp" style="--cc:#7a8595;"><div class="ct">逻辑后端</div><div class="cs">低成本公网 API · 同样调用云端</div></div></div></div>
+  </div>
+
+</div></div></body></html>

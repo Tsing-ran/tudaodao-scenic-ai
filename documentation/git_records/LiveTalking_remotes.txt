@@ -1,0 +1,2 @@
+origin	https://github.com/lipku/LiveTalking.git (fetch)
+origin	https://github.com/lipku/LiveTalking.git (push)

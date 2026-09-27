@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<!-- 图：视觉定位两段式（认地标 → 受约束 RAG 讲解 · Visio 风格）。源文件。渲染宽≈2280 → {width≈79%}。 -->
+<html lang="zh"><head><meta charset="utf-8"><link rel="stylesheet" href="_kit.css">
+<style>
+  .fig{width:2280px;}
+  .col{display:flex;flex-direction:column;align-items:center;}
+  .start{border-radius:40px;border:3px solid #5b6775;background:#f1f3f5;color:#2c3440;
+    font-size:56px;font-weight:700;padding:18px 50px;white-space:nowrap;}
+  .panel{width:100%;border-radius:18px;border:3px solid var(--c);background:var(--tint);
+    box-shadow:5px 8px 14px rgba(60,70,85,0.22);overflow:hidden;}
+  .panel .ph{background:var(--c);color:#fff;font-size:54px;font-weight:700;padding:18px 30px;white-space:nowrap;}
+  .panel .pb{padding:26px 34px;display:flex;flex-direction:column;gap:14px;}
+  .step{font-size:56px;color:#222834;line-height:1.3;white-space:nowrap;}
+  .branch{display:flex;gap:30px;align-items:stretch;}
+  .br{flex:1 1 0;border-radius:12px;padding:18px 26px;display:flex;flex-direction:column;gap:6px;}
+  .br .bt{font-size:48px;font-weight:700;white-space:nowrap;}
+  .br .bl{font-size:50px;color:#222834;white-space:nowrap;}
+  .br.yes{background:#e6f7ef;border:3px solid #1f9b6c;}
+  .br.yes .bt{color:#1f9b6c;}
+  .br.no{background:#f4f6f7;border:3px dashed #7a8595;}
+  .br.no .bt{color:#7a8595;}
+  .end{width:100%;border-radius:16px;border:3px solid #1f9b6c;background:#1f9b6c;color:#fff;
+    font-size:54px;font-weight:700;line-height:1.32;padding:24px 34px;text-align:center;
+    box-shadow:4px 6px 12px rgba(60,70,85,0.24);}
+  .note{margin-top:30px;width:100%;border-left:14px solid #e67e22;background:#fdf3e7;border-radius:10px;
+    padding:24px 34px;}
+  .note .nl{font-size:50px;color:#5a4326;line-height:1.34;white-space:nowrap;}
+  .adown svg{display:block;}
+</style></head><body>
+<div class="fig"><div class="col">
+
+  <div class="start">游客拍摄景物照片 · POST /chat/image</div>
+  <div class="adown"><svg width="50" height="50"><line x1="25" y1="2" x2="25" y2="32" stroke="#5a6473" stroke-width="6"/><polygon points="25,50 14,30 36,30" fill="#5a6473"/></svg></div>
+
+  <div class="panel c-purple">
+    <div class="ph">第一段 · 视觉认地标（qwen3-vl-plus）</div>
+    <div class="pb">
+      <div class="step">任务严格限定为「只识别地标」，输出 [位置:X]</div>
+      <div class="step" style="color:#8e44ad;font-weight:700;">判定：识别置信是否充足？</div>
+      <div class="branch">
+        <div class="br yes"><div class="bt">是</div><div class="bl">锚定位置 X（如「大佛广场」）</div></div>
+        <div class="br no"><div class="bt">否</div><div class="bl">不武断定位 → 转通用引导（结束）</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="adown"><svg width="50" height="50"><line x1="25" y1="2" x2="25" y2="32" stroke="#5a6473" stroke-width="6"/><polygon points="25,50 14,30 36,30" fill="#5a6473"/></svg></div>
+
+  <div class="panel c-teal">
+    <div class="ph">第二段 · RAG 接地讲解（知识库约束）</div>
+    <div class="pb">
+      <div class="step">以位置 X 为锚点喂回 RAG，走 navigation 意图</div>
+      <div class="step">知识库检索该景点事实（典故 / 周边动线）</div>
+      <div class="step">复用 group_type 人格，生成讲解 + 指路</div>
+    </div>
+  </div>
+  <div class="adown"><svg width="50" height="50"><line x1="25" y1="2" x2="25" y2="32" stroke="#5a6473" stroke-width="6"/><polygon points="25,50 14,30 36,30" fill="#5a6473"/></svg></div>
+
+  <div class="end">数字人开口：「您在大佛广场，这尊大佛……往东 200 米是九龙灌浴」</div>
+
+  <div class="note">
+    <div class="nl">设计要点：视觉只做「认」，知识交还受约束的 RAG</div>
+    <div class="nl">把幻觉挡在讲解之前 —— 事实必须有知识库来源</div>
+  </div>
+
+</div></div></body></html>

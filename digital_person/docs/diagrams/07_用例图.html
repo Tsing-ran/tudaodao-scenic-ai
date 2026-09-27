@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<!-- 图 2-1：系统用例图（双角色域 · 演员左置、用例单列、关联线自演员单点扇出，零交叉）。源文件。渲染宽≈2080 → {width≈72%}。 -->
+<html lang="zh"><head><meta charset="utf-8"><link rel="stylesheet" href="_kit.css">
+<style>
+  .fig{width:2080px;}
+  .sys{border:5px solid #9aa6b4;border-radius:30px;background:#fcfdfe;
+    box-shadow:6px 10px 22px rgba(60,70,85,0.12);overflow:hidden;}
+  .systitle{background:#eef1f5;color:#2b3440;font-size:58px;font-weight:700;text-align:center;
+    padding:20px 0;border-bottom:3px solid #dfe4ea;letter-spacing:1px;}
+  .domains{display:flex;gap:36px;padding:36px;align-items:stretch;}
+  .domain{flex:1 1 0;min-width:0;border:3px solid var(--c);border-radius:22px;background:var(--tint);
+    display:flex;flex-direction:column;overflow:hidden;}
+  .dhead{background:var(--c);color:#fff;font-size:46px;font-weight:700;text-align:center;
+    padding:16px 0;white-space:nowrap;}
+  .dbody{flex:1;display:flex;align-items:center;justify-content:center;gap:0;padding:30px 30px 30px 24px;}
+  /* 演员：图标 + 名（左置，垂直居中） */
+  .actor{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:14px;}
+  .actor .aname{font-size:44px;font-weight:700;color:var(--c);white-space:nowrap;}
+  /* 关联线扇出区（演员单点 → 各用例左缘） */
+  .gut{flex:0 0 auto;}
+  /* 用例胶囊单列 */
+  .uccol{flex:1 1 0;display:flex;flex-direction:column;gap:20px;}
+  .uc{height:128px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;background:#fff;border:3px solid var(--c);
+    border-radius:64px;padding:8px 22px;box-shadow:2px 3px 7px rgba(60,70,85,0.10);}
+  .uc .ucm{font-size:44px;color:#222834;line-height:1.15;white-space:nowrap;}
+  .uc .ucs{font-size:32px;color:#5b6675;line-height:1.15;white-space:nowrap;margin-top:3px;}
+  .extend{margin:0 30px 26px;display:flex;align-items:center;gap:16px;
+    border:3px dashed var(--c);border-radius:16px;background:#fff;padding:13px 22px;}
+  .extend .tag{flex:0 0 auto;font-size:32px;font-weight:700;color:var(--c);font-style:italic;}
+  .extend .txt{font-size:36px;color:#3a4250;line-height:1.22;}
+  .extend .txt b{color:#222834;}
+</style></head><body>
+<div class="fig">
+  <div class="sys">
+    <div class="systitle">途叨叨 · 景区导览 AI 数字人系统</div>
+    <div class="domains">
+
+      <!-- 游客域（C 端）：8 用例，列高 = 8*128 + 7*20 = 1164，演员锚点 y=582 -->
+      <div class="domain c-blue">
+        <div class="dhead">游客交互端 · C 端</div>
+        <div class="dbody">
+          <div class="actor">
+            <svg width="78" height="112" viewBox="0 0 78 112"><g fill="none" stroke="#2e86de" stroke-width="6.5" stroke-linecap="round">
+              <circle cx="39" cy="20" r="16" fill="#2e86de" stroke="none"/>
+              <line x1="39" y1="38" x2="39" y2="74"/><line x1="10" y1="52" x2="68" y2="52"/>
+              <line x1="39" y1="74" x2="16" y2="106"/><line x1="39" y1="74" x2="62" y2="106"/>
+            </g></svg>
+            <span class="aname">游客</span>
+          </div>
+          <svg class="gut" width="86" height="1164" viewBox="0 0 86 1164">
+            <defs><marker id="ab" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto">
+              <path d="M1,1 L10,5.5 L1,10" fill="none" stroke="#7d8896" stroke-width="2"/></marker></defs>
+            <g stroke="#7d8896" stroke-width="3" marker-end="url(#ab)">
+              <line x1="2" y1="582" x2="84" y2="64"/>
+              <line x1="2" y1="582" x2="84" y2="212"/>
+              <line x1="2" y1="582" x2="84" y2="360"/>
+              <line x1="2" y1="582" x2="84" y2="508"/>
+              <line x1="2" y1="582" x2="84" y2="656"/>
+              <line x1="2" y1="582" x2="84" y2="804"/>
+              <line x1="2" y1="582" x2="84" y2="952"/>
+              <line x1="2" y1="582" x2="84" y2="1100"/>
+            </g>
+          </svg>
+          <div class="uccol">
+            <div class="uc"><span class="ucm">被主动迎宾</span></div>
+            <div class="uc"><span class="ucm">文本提问</span></div>
+            <div class="uc"><span class="ucm">语音提问</span></div>
+            <div class="uc"><span class="ucm">拍照视觉定位</span></div>
+            <div class="uc"><span class="ucm">听个性化讲解</span></div>
+            <div class="uc"><span class="ucm">情绪安抚关怀</span></div>
+            <div class="uc"><span class="ucm">获取路线推荐</span><span class="ucs">含错峰建议</span></div>
+            <div class="uc"><span class="ucm">查看行程游记</span></div>
+          </div>
+        </div>
+        <div class="extend">
+          <span class="tag">«extend»</span>
+          <span class="txt"><b>听个性化讲解</b> 扩展 <b>文本提问</b>，按 group_type 差异化叙事</span>
+        </div>
+      </div>
+
+      <!-- 管理方域（B 端）：5 用例，列高 = 5*128 + 4*20 = 720，演员锚点 y=360 -->
+      <div class="domain c-teal">
+        <div class="dhead">景区管理端 · B 端</div>
+        <div class="dbody">
+          <div class="actor">
+            <svg width="78" height="112" viewBox="0 0 78 112"><g fill="none" stroke="#16a085" stroke-width="6.5" stroke-linecap="round">
+              <circle cx="39" cy="20" r="16" fill="#16a085" stroke="none"/>
+              <line x1="39" y1="38" x2="39" y2="74"/><line x1="10" y1="52" x2="68" y2="52"/>
+              <line x1="39" y1="74" x2="16" y2="106"/><line x1="39" y1="74" x2="62" y2="106"/>
+            </g></svg>
+            <span class="aname" style="color:#16a085">景区<br>管理方</span>
+          </div>
+          <svg class="gut" width="86" height="720" viewBox="0 0 86 720">
+            <defs><marker id="ag" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto">
+              <path d="M1,1 L10,5.5 L1,10" fill="none" stroke="#7d8896" stroke-width="2"/></marker></defs>
+            <g stroke="#7d8896" stroke-width="3" marker-end="url(#ag)">
+              <line x1="2" y1="360" x2="84" y2="64"/>
+              <line x1="2" y1="360" x2="84" y2="212"/>
+              <line x1="2" y1="360" x2="84" y2="360"/>
+              <line x1="2" y1="360" x2="84" y2="508"/>
+              <line x1="2" y1="360" x2="84" y2="656"/>
+            </g>
+          </svg>
+          <div class="uccol">
+            <div class="uc"><span class="ucm">知识库管理</span><span class="ucs">上传 / 更新 / 删除</span></div>
+            <div class="uc"><span class="ucm">数字人形象配置</span><span class="ucs">换装 / 音色</span></div>
+            <div class="uc"><span class="ucm">查看数据大屏</span></div>
+            <div class="uc"><span class="ucm">查看感受度报告</span></div>
+            <div class="uc"><span class="ucm">负面情绪 / 突发预警</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</body></html>

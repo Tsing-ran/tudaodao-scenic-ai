@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<!-- 图：分层调度器 L0–L4（竖向分层 · Visio 风格）。源文件。渲染宽≈2000 → {width≈69%}。 -->
+<html lang="zh"><head><meta charset="utf-8"><link rel="stylesheet" href="_kit.css">
+<style>
+  .fig{width:2000px;}
+  .flow{display:flex;flex-direction:column;align-items:center;}
+  .lv{width:100%;display:flex;align-items:stretch;border-radius:16px;border:3px solid var(--c);
+    background:var(--tint);box-shadow:4px 6px 12px rgba(60,70,85,0.20);overflow:hidden;}
+  .lv .h{flex:0 0 300px;background:var(--c);color:#fff;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:6px;padding:20px;}
+  .lv .h .t{font-size:64px;font-weight:700;}
+  .lv .h .s{font-size:46px;font-weight:700;white-space:nowrap;}
+  .lv .b{flex:1 1 0;min-width:0;display:flex;flex-direction:column;justify-content:center;
+    gap:8px;padding:22px 34px;}
+  .lv .b .l{font-size:58px;color:#222834;line-height:1.32;white-space:nowrap;}
+  .down svg{display:block;}
+</style></head><body>
+<div class="fig"><div class="flow">
+
+  <div class="lv c-blue"><div class="h"><div class="t">L0</div><div class="s">准入</div></div>
+    <div class="b"><div class="l">L1 命中 → 0 GPU 返回；池满 → L3 降级文字</div>
+      <div class="l" style="color:#5b6675;font-size:50px;">仅需实时渲染的请求才进入下层</div></div></div>
+  <div class="adown"><svg width="50" height="48"><line x1="25" y1="2" x2="25" y2="30" stroke="#5a6473" stroke-width="6"/><polygon points="25,48 14,28 36,28" fill="#5a6473"/></svg></div>
+
+  <div class="lv c-indigo"><div class="h"><div class="t">L1</div><div class="s">分发</div></div>
+    <div class="b"><div class="l">CHBL 一致性哈希有界负载，选候选热机</div>
+      <div class="l">超界时 Po2C（随机取二、择较空者）溢出</div></div></div>
+  <div class="adown"><svg width="50" height="48"><line x1="25" y1="2" x2="25" y2="30" stroke="#5a6473" stroke-width="6"/><polygon points="25,48 14,28 36,28" fill="#5a6473"/></svg></div>
+
+  <div class="lv c-teal"><div class="h"><div class="t">L2</div><div class="s">队列</div></div>
+    <div class="b"><div class="l">单机 FIFO；混合优先级按 &lt;5s 截止 EDF 排序</div></div></div>
+  <div class="adown"><svg width="50" height="48"><line x1="25" y1="2" x2="25" y2="30" stroke="#5a6473" stroke-width="6"/><polygon points="25,48 14,28 36,28" fill="#5a6473"/></svg></div>
+
+  <div class="lv c-purple"><div class="h"><div class="t">L3</div><div class="s">渲染</div></div>
+    <div class="b"><div class="l">Ditto 单用户流式渲染，首句抢跑 &lt;5s 开口</div>
+      <div class="l">说完按估算时长释放槽位</div></div></div>
+  <div class="adown"><svg width="50" height="48"><line x1="25" y1="2" x2="25" y2="30" stroke="#5a6473" stroke-width="6"/><polygon points="25,48 14,28 36,28" fill="#5a6473"/></svg></div>
+
+  <div class="lv c-green"><div class="h"><div class="t">L4</div><div class="s">伸缩</div></div>
+    <div class="b"><div class="l">预测式（客流曲线预热）+ 反应式（队列阈值）</div>
+      <div class="l">闲时缩零</div></div></div>
+
+</div></div></body></html>

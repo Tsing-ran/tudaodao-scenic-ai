@@ -1,0 +1,410 @@
+diff --git a/app.py b/app.py
+index 5f341cd..f960ebc 100644
+--- a/app.py
++++ b/app.py
+@@ -128,6 +128,7 @@ def main():
+         'musetalk':   'avatars.musetalk_avatar',
+         'wav2lip':    'avatars.wav2lip_avatar',
+         'ultralight': 'avatars.ultralight_avatar',
++        'ditto':      'avatars.ditto_avatar',
+     }
+     import importlib
+     avatar_mod = importlib.import_module(_avatar_modules[opt.model])
+@@ -148,6 +149,9 @@ def main():
+         model = load_model(opt)
+         global_avatars[opt.avatar_id] = load_avatar(opt.avatar_id)
+         warm_up(opt.batch_size,global_avatars[opt.avatar_id],160)
++    elif opt.model == 'ditto':
++        model = load_model()
++        global_avatars[opt.avatar_id] = load_avatar(opt.avatar_id)
+ 
+     # init rtc manager
+     session_manager.init_builder(build_avatar_session)
+diff --git a/avatars/musetalk_avatar.py b/avatars/musetalk_avatar.py
+index 76db7f6..0f3662c 100644
+--- a/avatars/musetalk_avatar.py
++++ b/avatars/musetalk_avatar.py
+@@ -117,6 +117,39 @@ EMO_TO_BASE = {
+     "empathetic": "concerned", "apologetic": "concerned", "concerned": "concerned",
+ }
+ 
++# ── 嘴部锐度旋钮（运行时，零重烘；自动调参闭环的"执行器"）─────────────
++# 固定 EMA(alpha=0.4) 消抖的同时会把快速口型混成运动模糊（抖动↔模糊二选一）。
++# adaptive 模式：按前后帧运动量动态调 alpha——静止时重平滑(防抖)、
++# 快速张合时几乎不平滑(保锐度)，打破二选一。unsharp 再补 256 上采样的软化。
++# 默认 = 用户 6-08 确认的 fixed0.4 平滑 + 6-10 闭环终审加的 unsharp0.4（牙齿/唇缘更清、零光晕）。
++# 自动调参闭环：写 TUNE_FILE(JSON) 即可热改参数、无需重启 LiveTalking。
++_TUNE = {
++    "ema_mode": os.getenv("MUSETALK_EMA_MODE", "fixed"),            # fixed | adaptive
++    "ema_alpha": float(os.getenv("MUSETALK_EMA_ALPHA", "0.4")),     # 静止时当前帧权重
++    "ema_motion_full": float(os.getenv("MUSETALK_EMA_MOTION_FULL", "18")),  # 灰阶差≥此→alpha→1
++    "sharpen": float(os.getenv("MUSETALK_SHARPEN", "0.4")),         # unsharp 强度（用户终审定 0.4：牙齿/唇缘更清、零光晕）
++    "sharpen_sigma": float(os.getenv("MUSETALK_SHARPEN_SIGMA", "1.0")),
++}
++_TUNE_FILE = os.getenv("MUSETALK_TUNE_FILE", "/tmp/tune/params.json")
++_TUNE_MTIME = [0.0]
++
++def _refresh_tune():
++    """热加载：TUNE_FILE 变更时刷新嘴部旋钮，免重启 LiveTalking（调参闭环用）。"""
++    try:
++        m = os.path.getmtime(_TUNE_FILE)
++    except OSError:
++        return
++    if m == _TUNE_MTIME[0]:
++        return
++    _TUNE_MTIME[0] = m
++    try:
++        import json as _json
++        with open(_TUNE_FILE) as f:
++            _TUNE.update(_json.load(f))
++        logger.info(f"[tune] 嘴部旋钮热加载 → {_TUNE}")
++    except Exception as e:
++        logger.warning(f"[tune] 读取 {_TUNE_FILE} 失败: {e}")
++
+ 
+ @register("avatar", "musetalk")
+ class MuseReal(BaseAvatar):
+@@ -220,10 +253,22 @@ class MuseReal(BaseAvatar):
+ 
+         res_frame = cv2.resize(pred_frame.astype(np.uint8),(x2-x1,y2-y1))
+ 
+-        # 时序 EMA：40% 当前帧 + 60% 上一帧，对嘴型做低通滤波，消除逐帧抖动
++        _refresh_tune()  # 调参闭环：热加载嘴部旋钮（仅 mtime 变更时真正读盘）
++        # 时序 EMA：对嘴型做低通滤波消抖。fixed=固定 alpha；
++        # adaptive=按运动量自适应（静止重平滑、运动保锐度），打破抖动↔模糊二选一。
+         if self._prev_res_frame is not None and self._prev_res_frame.shape == res_frame.shape:
+-            res_frame = cv2.addWeighted(res_frame, 0.4, self._prev_res_frame, 0.6, 0)
+-        self._prev_res_frame = res_frame.copy()
++            if _TUNE["ema_mode"] == "adaptive":
++                diff = float(np.mean(cv2.absdiff(res_frame, self._prev_res_frame)))
++                alpha = _TUNE["ema_alpha"] + (1.0 - _TUNE["ema_alpha"]) * min(diff / _TUNE["ema_motion_full"], 1.0)
++            else:
++                alpha = _TUNE["ema_alpha"]
++            res_frame = cv2.addWeighted(res_frame, alpha, self._prev_res_frame, 1.0 - alpha, 0)
++        self._prev_res_frame = res_frame.copy()   # 存未锐化版，避免锐化随递归累积
++
++        # unsharp mask：补偿 256→native 上采样 + EMA 带来的软化（0=关）
++        if _TUNE["sharpen"] > 0:
++            blur = cv2.GaussianBlur(res_frame, (0, 0), _TUNE["sharpen_sigma"])
++            res_frame = cv2.addWeighted(res_frame, 1.0 + _TUNE["sharpen"], blur, -_TUNE["sharpen"], 0)
+ 
+         mask = self.mask_list_cycle[idx]
+         mask_crop_box = self.mask_coords_list_cycle[idx]
+diff --git a/server/routes.py b/server/routes.py
+index 13f8ce1..e616893 100644
+--- a/server/routes.py
++++ b/server/routes.py
+@@ -56,6 +56,10 @@ async def human(request):
+         datainfo = {}
+         if params.get('tts'):  # tts 参数透传（voice, emotion 等）
+             datainfo['tts'] = params.get('tts')
++            # 面部情绪管理：按 RAG 情绪标签切换表情底座（neutral/happy/concerned）
++            emo = params['tts'].get('emotion')
++            if emo and hasattr(avatar_session, 'set_emotion'):
++                avatar_session.set_emotion(emo)
+ 
+         if params['type'] == 'echo':
+             avatar_session.put_msg_txt(params['text'], datainfo)
+diff --git a/server/rtc_manager.py b/server/rtc_manager.py
+index ed3f422..425e0ac 100644
+--- a/server/rtc_manager.py
++++ b/server/rtc_manager.py
+@@ -58,9 +58,11 @@ class RTCManager:
+         avatar_session = session_manager.get_session(sessionid)
+ 
+         # 创建 PeerConnection
+-        ice_server = RTCIceServer(urls='stun:stun.freeswitch.org:3478')
++        # 注：局域网/本机演示用 host 候选直连即可，不需要 STUN；
++        # 原配置的境外 stun.freeswitch.org 在国内不稳/被墙，会拖垮 ICE 连通性检查
++        # 导致所有候选对 FAILED → 数字人黑屏。禁用 STUN 后本机/同 WiFi 直连。
+         pc = RTCPeerConnection(
+-            configuration=RTCConfiguration(iceServers=[ice_server])
++            configuration=RTCConfiguration(iceServers=[])
+         )
+         self.pcs.add(pc)
+ 
+diff --git a/streamout/rtmp.py b/streamout/rtmp.py
+index 0ddc809..7b58047 100644
+--- a/streamout/rtmp.py
++++ b/streamout/rtmp.py
+@@ -2,8 +2,11 @@
+ #  Output — RTMP 推流输出
+ ###############################################################################
+ 
+-import subprocess
++import os
++import json
+ import time
++import threading
++import urllib.request
+ import numpy as np
+ from streamout.base_output import BaseOutput
+ from registry import register
+@@ -32,11 +35,69 @@ class RTMPOutput(BaseOutput):
+         self.lasttime = time.perf_counter()
+         self.totaltime = 0
+ 
++        # ── 推流看门狗状态 ─────────────────────────────────────────────
++        # python_rtmpstream(C++ Streamer) 无自动重连：RTMP 连接被 SRS 断开后
++        # (实测每 5-10min 一次 "cleanup when unpublish")，stream_frame() 继续往
++        # 死管子写、不报错 → 画面永久卡死。看门狗轮询 SRS publish.active，掉线则
++        # 置 _reconnect_pending；emitter 线程在 push_video_frame 顶部消费此标志、
++        # 重建 Streamer(仅重连 RTMP ~1-2s，不碰 TRT/引擎)。所有 _streamer 改动
++        # 都在 emitter 单线程内，看门狗只置 bool → 零锁零竞态。
++        self._reconnect_pending = False     # 看门狗→emitter 的重连请求(仅 emitter 清)
++        self._ever_active = False            # 曾成功发布过(避免启动期误判为掉线)
++        self._reconnect_count = 0            # 累计重连次数(观测用)
++        self._srs_api = os.getenv(
++            "SRS_API_URL", "http://127.0.0.1:1985/api/v1/streams/")
++        # 从 push_url 取流名：rtmp://host/live/livestream → livestream
++        self._stream_key = self.push_url.rstrip('/').split('/')[-1]
++        # 不走系统代理(localhost 调 SRS API)
++        self._url_opener = urllib.request.build_opener(
++            urllib.request.ProxyHandler({}))
++
+     def start(self) -> None:
+         """Streamer 延迟到第一帧视频到达时再根据实际宽高初始化"""
+         import queue
+         self._audio_queue = queue.Queue()
+         self._quit_event = False
++        # 启动推流看门狗(daemon，随进程退出)
++        self._watchdog_thread = threading.Thread(
++            target=self._watchdog, name="rtmp-watchdog", daemon=True)
++        self._watchdog_thread.start()
++
++    def _srs_publish_active(self) -> Optional[bool]:
++        """查 SRS 当前是否有活跃发布端推到本流；API 不可达返回 None(不算掉线)。"""
++        try:
++            with self._url_opener.open(self._srs_api, timeout=2) as r:
++                data = json.loads(r.read().decode("utf-8"))
++        except Exception:
++            return None
++        for s in data.get("streams", []):
++            url = s.get("url", "")
++            name = s.get("name", "")
++            if url.endswith("/" + self._stream_key) or self._stream_key in name:
++                return bool(s.get("publish", {}).get("active"))
++        return False   # 流对象都没有 = 没在发布
++
++    def _watchdog(self) -> None:
++        """轮询 SRS publish.active；连续两次(~6s)确认掉线则请求 emitter 重连。"""
++        miss = 0
++        while not self._quit_event:
++            time.sleep(2)   # 轮询周期；2 次未发布(~4s)才判掉线，避开单次 API 抖动误判
++            if self._streamer is None or self._reconnect_pending:
++                continue   # 尚未起流 / 正在重连，跳过
++            active = self._srs_publish_active()
++            if active is None:
++                continue   # API 抖动，不判掉线
++            if active:
++                self._ever_active = True
++                miss = 0
++            elif self._ever_active:
++                miss += 1
++                if miss >= 2:
++                    logger.warning(
++                        "[rtmp-watchdog] 检测到推流掉线(publish.active=false)，"
++                        "请求 emitter 重连 RTMP")
++                    self._reconnect_pending = True
++                    miss = 0
+ 
+     def _init_streamer(self, frame_height, frame_width):
+         try:
+@@ -61,8 +122,10 @@ class RTMPOutput(BaseOutput):
+             
+         sc.stream_server = self.push_url
+ 
+-        self._streamer = Streamer()
+-        self._streamer.init(sc)
++        # 先 init 再赋值：避免半初始化的 Streamer 被(同线程后续)音频帧调用
++        streamer = Streamer()
++        streamer.init(sc)
++        self._streamer = streamer
+ 
+         self._starttime=time.perf_counter()
+         self._totalframe=0
+@@ -70,15 +133,29 @@ class RTMPOutput(BaseOutput):
+ 
+     def push_video_frame(self, frame) -> None:
+         if isinstance(frame, np.ndarray):
++            # 看门狗请求重连：丢弃旧 Streamer(C++ 析构关旧 RTMP)，下方按需重建。
++            # 仅 emitter 线程在此清标志/改 _streamer → 与看门狗无竞态。
++            if self._reconnect_pending:
++                self._reconnect_pending = False
++                self._streamer = None
++                self._reconnect_count += 1
++                logger.warning(f"[rtmp-watchdog] 第 {self._reconnect_count} 次重建 Streamer 重连 RTMP")
+             if self._streamer is None:
+                 self.height, self.width = frame.shape[:2]
+-                self._init_streamer(self.height, self.width)
+-                
++                try:
++                    self._init_streamer(self.height, self.width)
++                except Exception as e:
++                    # RTMP 连接瞬时失败：保持 _streamer=None，丢弃本帧、下一帧重试，
++                    # 绝不让异常冒泡杀死 emitter 线程(否则永久黑屏)
++                    self._streamer = None
++                    logger.warning(f"[rtmp-watchdog] Streamer 初始化失败({type(e).__name__}: {e})，下一帧重试")
++                    return
++
+                 # Consume any buffered audio that arrived before the first video frame
+                 while not self._audio_queue.empty():
+                     buffered_audio = self._audio_queue.get()
+                     self._streamer.stream_frame_audio(buffered_audio)
+-                    
++
+             import cv2
+             # Convert BGR (OpenCV) to RGB since Streamer expects RGB memory layout
+             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+@@ -111,6 +188,6 @@ class RTMPOutput(BaseOutput):
+                 self._audio_queue.put(frame)
+ 
+     def stop(self) -> None:
+-        self._quit_event = True
++        self._quit_event = True   # 看门狗线程随之退出
+         self._streamer = None
+         logger.info("RTMP output stopped")
+diff --git a/tts/qwentts.py b/tts/qwentts.py
+index 17ebce1..ada5065 100644
+--- a/tts/qwentts.py
++++ b/tts/qwentts.py
+@@ -24,6 +24,15 @@ except ImportError:
+ SRC_SR = 24000   # Qwen TTS 只支持 24kHz 输出
+ DST_SR = 16000   # 项目标准采样率
+ 
++# ── 韵律随情绪：speech_rate 绑定 RAG 的 [情绪:X]（播音"停连/语气"外化到声音）──
++# 6 类情绪并到 3 档语速。基准 0.9（用户定：放慢避免"急促/谄媚"）。
++# 关切/抱歉再放慢=关怀感；喜悦/兴奋略快=活泼但不抢拍（用户对"太快"敏感，故只 +0.03）。
++EMO_RATE = {
++    "happy": 0.93, "excited": 0.93,
++    "neutral": 0.90, "curious": 0.90, "calm": 0.90,
++    "empathetic": 0.85, "apologetic": 0.85, "concerned": 0.85,
++}
++
+ 
+ @register("tts", "qwentts")
+ class QwenTTS(BaseTTS):
+@@ -56,12 +65,18 @@ class QwenTTS(BaseTTS):
+         else:
+             logger.warning("QwenTTS: DASHSCOPE_API_KEY 未设置，请设置环境变量或通过参数传入")
+ 
++        # 当前会话语速（随情绪动态调整，见 txt_to_audio）
++        self.speech_rate = 0.9
++
+         # ---------- 内部状态 ----------
+         self._remainder = np.array([], dtype=np.float32)  # 上次重采样后不足一 chunk 的 16kHz 样本
+         self._response_event = threading.Event()
+         self._first_chunk = True          # 当前合成的一句话里的第一个音频包
+         self._current_text = ''
+         self._current_textevent = {}
++        self._reconnecting = False        # 主动重连期间抑制 on_close 置事件（防 wait 早返回丢音频）
++        self._alive = False               # 连接健康：on_open 置真，on_close/error 置假
++                                          # Qwen WS 空闲 300s 被服务端超时关闭 → 合成前据此重连
+ 
+         # ---------- 回调类 ----------
+         tts_ref = self
+@@ -69,10 +84,15 @@ class QwenTTS(BaseTTS):
+         class _Callback(QwenTtsRealtimeCallback):
+             def on_open(self) -> None:
+                 logger.info("QwenTTS WebSocket 连接已建立")
++                tts_ref._alive = True
+ 
+             def on_close(self, close_status_code, close_msg) -> None:
+                 logger.info(f"QwenTTS WebSocket 关闭: code={close_status_code}, msg={close_msg}")
+-                tts_ref._response_event.set()
++                tts_ref._alive = False
++                # 主动重连（换音色/语速）触发的 close 不许置事件：否则 txt_to_audio 的
++                # wait() 早返回 → BaseTTS 状态离开 RUNNING → 后续音频 delta 全被丢 → 静音
++                if not tts_ref._reconnecting:
++                    tts_ref._response_event.set()
+ 
+             def on_event(self, response: dict) -> None:
+                 try:
+@@ -94,6 +114,7 @@ class QwenTTS(BaseTTS):
+ 
+                     elif event_type == 'error':
+                         logger.error(f"QwenTTS 错误: {response}")
++                        tts_ref._alive = False   # 服务端错误（如空闲 300s 超时）后连接不可用
+                         tts_ref._response_event.set()
+ 
+                 except Exception as e:
+@@ -133,23 +154,21 @@ class QwenTTS(BaseTTS):
+ 
+         try:
+             #logger.info(f"QwenTTS 发送文本: {text[:80]}...")
++            # ⚠️ 延迟权衡（2026-06-13）：Qwen-TTS 改 speech_rate 必须重连(~1.5-2s)，挂在首句
++            #    latency-critical 路径上→端到端可超 5s。情绪的主要表达已外化到「脸」(Ditto 8 类
++            #    emo 条件，set_emotion)，语速 0.05 的差异收益远不及 2s 延迟代价 → 固定 speech_rate=0.9，
++            #    不再随情绪重连。仅「换音色」「连接已死(空闲300s超时)」才重连（这两个无法避免）。
+             if ref_file != self.voice:
+                 logger.info(f'ref_file:{ref_file},self.voice:{self.voice}')
+-                self.voice=ref_file
+-                self._tts_client.close()
+-                self._tts_client.connect()
+-                self._tts_client.update_session(
+-                    voice=self.voice,
+-                    response_format=AudioFormat.PCM_24000HZ_MONO_16BIT,  # Qwen TTS 只支持 24kHz 输出
+-                    sample_rate=16000,
+-                    speech_rate=0.9,
+-                    mode='commit',
+-                )
+-            self._tts_client.append_text(text)
+-            self._tts_client.commit()
++                self.voice = ref_file
++                self._reconnect_session()
++            elif not self._alive:
++                # 连接因空闲 300s 超时/服务端错误已死 → 先重连再合成
++                # （否则 append_text 到死连接 → "Connection is already closed" → 静音）
++                logger.info("QwenTTS 连接已失效（空闲超时？），合成前重连")
++                self._reconnect_session()
+ 
+-            # 等待 response.done（音频在回调中流式处理）
+-            self._response_event.wait(timeout=60)
++            self._synthesize_with_retry(text)
+ 
+             t_end = time.perf_counter()
+             logger.info(f"QwenTTS 合成完成，耗时: {t_end - t_start:.2f}s")
+@@ -157,6 +176,43 @@ class QwenTTS(BaseTTS):
+         except Exception as e:
+             logger.exception(f"QwenTTS txt_to_audio 异常: {e}")
+ 
++    def _synthesize_with_retry(self, text: str):
++        """合成一句；若连接中途死亡（commit/append 抛错或 error 回调），重连后重试一次。"""
++        try:
++            self._tts_client.append_text(text)
++            self._tts_client.commit()
++            self._response_event.wait(timeout=60)
++            if self._alive:
++                return
++            # wait 返回但连接已死（error 回调置假）= 多半没出音频 → 重试
++            logger.warning("QwenTTS 合成期间连接失效，重连重试一次")
++        except Exception as e:
++            logger.warning(f"QwenTTS 合成失败（{type(e).__name__}: {e}），重连重试一次")
++        self._reconnect_session()
++        self._first_chunk = True
++        self._response_event.clear()
++        self._tts_client.append_text(text)
++        self._tts_client.commit()
++        self._response_event.wait(timeout=60)
++
++    def _reconnect_session(self):
++        """换音色/语速的统一重连（Qwen session 已 start 后参数不可变更）。
++        _reconnecting 抑制 on_close 置事件；完后再 clear 一次兜底竞态。"""
++        self._reconnecting = True
++        try:
++            self._tts_client.close()
++            self._tts_client.connect()
++            self._tts_client.update_session(
++                voice=self.voice,
++                response_format=AudioFormat.PCM_24000HZ_MONO_16BIT,  # Qwen TTS 只支持 24kHz 输出
++                sample_rate=16000,
++                speech_rate=self.speech_rate,
++                mode='commit',
++            )
++        finally:
++            self._reconnecting = False
++        self._response_event.clear()
++
+     # ========================== 流式音频处理（回调中调用）==========================
+ 
+     def _on_audio_data(self, pcm_data: bytes):

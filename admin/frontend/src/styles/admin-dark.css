@@ -1,0 +1,392 @@
+/* ── 浅/深模式切换悬浮按钮（不 scope，两种模式都显示；顶栏始终深蓝，故白色半透胶囊在两模式均清晰）── */
+#admin-theme-toggle {
+  position: fixed; bottom: 20px; left: 24px; right: auto; top: auto; z-index: 10001;
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 13px; border-radius: 999px; cursor: pointer;
+  font-size: 12px; font-weight: 500; line-height: 1;
+  font-family: 'Alibaba PuHuiTi 3.0', 'HarmonyOS Sans SC', 'PingFang SC', sans-serif;
+  border: 1px solid rgba(255,255,255,0.20);
+  background: rgba(255,255,255,0.10); color: #fff;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  transition: background .15s, border-color .15s;
+}
+#admin-theme-toggle:hover { background: rgba(255,255,255,0.20); border-color: rgba(255,255,255,0.34); }
+#admin-theme-toggle:active { transform: translateY(1px); }
+#admin-theme-toggle svg { flex-shrink: 0; }
+
+/* ════════════════════════════════════════════════════════════════
+   管理端深色霓虹主题（CRM Dashboard 风格）
+   scope：<html>.admin-dark（admin-main.js 注入），游客端不受影响。
+   策略：覆盖 main.css 的 :root token → 结构色自动翻深色；
+        再补 Element Plus 深色覆盖 + 渐变工具变量。
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── 字体：HarmonyOS Sans SC（华为鸿蒙，子集化 woff2，与游客端统一）── */
+@font-face {
+  font-family: 'HarmonyOS Sans SC'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/fonts/HarmonyOS_Sans_SC_Regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'HarmonyOS Sans SC'; font-style: normal; font-weight: 500; font-display: swap;
+  src: url('/fonts/HarmonyOS_Sans_SC_Medium.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'HarmonyOS Sans SC'; font-style: normal; font-weight: 700; font-display: swap;
+  src: url('/fonts/HarmonyOS_Sans_SC_Bold.woff2') format('woff2');
+}
+
+.admin-dark {
+  /* ── 字体 token：与浅色同源（Inter 数字 + 阿里普惠体中文，生僻字回落鸿蒙）── */
+  --font-sans:  'Inter', 'Alibaba PuHuiTi 3.0', 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-serif: 'Inter', 'Alibaba PuHuiTi 3.0', 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+
+  /* ── Neutrals：文字反相为浅色 ── */
+  --c-ink:       #ECECF7;
+  --c-ink-2:     #C4C4DC;
+  --c-ink-3:     #8C8CAB;
+  --c-ink-4:     #62627E;
+  --c-border:    #2A2A48;
+  --c-border-2:  #3A3A5E;
+
+  /* ── Surfaces：深蓝紫底 + 略亮卡片 ── */
+  --c-paper:     #0F0F23;   /* 页面底 */
+  --c-paper-2:   #17172F;   /* 次级面/hover */
+  --c-surface:   #1A1A35;   /* 卡片 */
+  --c-surface-2: #20203F;   /* 卡片内嵌块 */
+
+  /* ── Primary accent：紫罗兰（替代 HHU 蓝）──
+     !important 必需：auth.js 的 applyTheme() 会把 --c-gold* 内联写到 <html>，
+     普通声明压不过内联，必须用 important 才能让深色生效（否则全站 gold 系回退浅蓝）。*/
+  --c-gold-dark: #6D28D9 !important;
+  --c-gold:      #8B5CF6 !important;
+  --c-gold-2:    #A78BFA !important;
+  --c-gold-3:    #C4B5FD !important;
+  --c-gold-bg:   rgba(139, 92, 246, 0.16) !important;
+  --c-gold-bdr:  rgba(139, 92, 246, 0.32) !important;
+
+  /* ── Secondary：青色 ── */
+  --c-blue:      #22D3EE;
+  --c-blue-2:    #67E8F9;
+  --c-blue-bg:   rgba(34, 211, 238, 0.12);
+  --c-blue-bdr:  rgba(34, 211, 238, 0.30);
+
+  /* ── 霓虹点缀 ── */
+  --c-pink:      #EC4899;
+  --c-violet:    #8B5CF6;
+  --c-cyan:      #22D3EE;
+
+  /* ── Semantic：暗底加亮 ── */
+  --c-green:     #34D399;
+  --c-green-bg:  rgba(52, 211, 153, 0.12);
+  --c-red:       #FB7185;
+  --c-red-bg:    rgba(251, 113, 133, 0.12);
+  --c-amber:     #FBBF24;
+  --c-amber-bg:  rgba(251, 191, 36, 0.12);
+
+  /* ── 渐变工具（统计卡/图表高亮）── */
+  --grad-violet: linear-gradient(135deg, #7C3AED 0%, #A78BFA 100%);
+  --grad-cyan:   linear-gradient(135deg, #0891B2 0%, #22D3EE 100%);
+  --grad-pink:   linear-gradient(135deg, #DB2777 0%, #A855F7 100%);
+  --grad-emerald:linear-gradient(135deg, #059669 0%, #34D399 100%);
+  --grad-card:   linear-gradient(160deg, #1E1E3D 0%, #17172F 100%);
+
+  /* ── Elevation：深色阴影 + 轻微辉光 ── */
+  --shadow-xs:   0 1px 2px rgba(0,0,0,0.35);
+  --shadow-sm:   0 1px 4px rgba(0,0,0,0.40), 0 0 0 1px rgba(255,255,255,0.04);
+  --shadow:      0 6px 24px rgba(0,0,0,0.45);
+  --shadow-lg:   0 12px 40px rgba(0,0,0,0.55);
+}
+
+/* ── 页面底 ── */
+.admin-dark, .admin-dark body { background: var(--c-paper); color: var(--c-ink); }
+/* 背景大色斑（呼应参考图左下/右上的紫青光晕） */
+.admin-dark body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(620px 420px at 88% -6%, rgba(34,211,238,0.10), transparent 60%),
+    radial-gradient(680px 480px at -6% 108%, rgba(139,92,246,0.14), transparent 60%);
+}
+.admin-dark #app { position: relative; z-index: 1; }
+
+/* ── Scrollbar ── */
+.admin-dark ::-webkit-scrollbar-thumb { background: #33335a; }
+.admin-dark ::-webkit-scrollbar-thumb:hover { background: #45457a; }
+
+/* ════════ Element Plus 深色覆盖 ════════ */
+.admin-dark .el-input__wrapper {
+  background-color: var(--c-surface-2) !important;
+  box-shadow: 0 0 0 1px var(--c-border) !important;
+}
+.admin-dark .el-input__wrapper:hover { box-shadow: 0 0 0 1px var(--c-border-2) !important; }
+.admin-dark .el-input__wrapper.is-focus { box-shadow: 0 0 0 2px var(--c-gold-bdr) !important; }
+.admin-dark .el-input__inner { color: var(--c-ink) !important; }
+.admin-dark .el-input__inner::placeholder { color: var(--c-ink-4) !important; }
+
+.admin-dark .el-textarea__inner {
+  background: var(--c-surface-2) !important;
+  color: var(--c-ink) !important;
+  border: 1px solid var(--c-border) !important;
+}
+.admin-dark .el-textarea__inner:focus {
+  border-color: var(--c-gold) !important;
+  box-shadow: 0 0 0 2px var(--c-gold-bg) !important;
+}
+.admin-dark .el-textarea__inner::placeholder { color: var(--c-ink-4) !important; }
+
+.admin-dark .el-select .el-input__wrapper { background: var(--c-surface-2) !important; }
+/* Element Plus 2.7+ 的 el-select 不再用 el-input 内壳，是独立的 el-select__wrapper 结构 */
+.admin-dark .el-select__wrapper {
+  background-color: var(--c-surface-2) !important;
+  box-shadow: 0 0 0 1px var(--c-border) inset !important;
+}
+.admin-dark .el-select__wrapper.is-hovering:not(.is-focused) { box-shadow: 0 0 0 1px var(--c-border-2) inset !important; }
+.admin-dark .el-select__wrapper.is-focused { box-shadow: 0 0 0 2px var(--c-gold-bdr) inset !important; }
+.admin-dark .el-select__placeholder { color: var(--c-ink) !important; }
+.admin-dark .el-select__placeholder.is-transparent { color: var(--c-ink-4) !important; }
+.admin-dark .el-select__caret { color: var(--c-ink-4) !important; }
+.admin-dark .el-select__popper.el-popper {
+  background: var(--c-surface) !important;
+  border: 1px solid var(--c-border) !important;
+}
+.admin-dark .el-select-dropdown {
+  background: var(--c-surface) !important;
+  border: 1px solid var(--c-border) !important;
+}
+.admin-dark .el-select-dropdown__item { color: var(--c-ink-2) !important; }
+.admin-dark .el-select-dropdown__item.is-hovering { background: var(--c-surface-2) !important; }
+.admin-dark .el-select-dropdown__item.is-selected { color: var(--c-gold-2) !important; }
+.admin-dark .el-popper.is-light { background: var(--c-surface) !important; border-color: var(--c-border) !important; }
+.admin-dark .el-popper.is-light .el-popper__arrow::before { background: var(--c-surface) !important; border-color: var(--c-border) !important; }
+
+.admin-dark .el-table {
+  --el-table-bg-color: transparent !important;
+  --el-table-header-bg-color: var(--c-surface-2) !important;
+  --el-table-tr-bg-color: transparent !important;
+  --el-table-row-hover-bg-color: var(--c-surface-2) !important;
+  --el-table-border-color: var(--c-border) !important;
+  --el-table-text-color: var(--c-ink-2) !important;
+  --el-table-header-text-color: var(--c-ink-3) !important;
+}
+
+.admin-dark .el-upload-dragger {
+  background: var(--c-surface-2) !important;
+  border: 1.5px dashed var(--c-border-2) !important;
+}
+.admin-dark .el-upload-dragger:hover {
+  border-color: var(--c-gold) !important;
+  background: var(--c-gold-bg) !important;
+}
+
+.admin-dark .el-switch__core {
+  background: var(--c-surface-2) !important;
+  border-color: var(--c-border-2) !important;
+}
+.admin-dark .el-switch.is-checked .el-switch__core {
+  background: var(--c-gold) !important;
+  border-color: var(--c-gold) !important;
+}
+.admin-dark .el-switch__label { color: var(--c-ink-3) !important; }
+.admin-dark .el-switch__label.is-active { color: var(--c-gold-2) !important; }
+
+.admin-dark .el-checkbox__inner {
+  background: var(--c-surface-2) !important;
+  border-color: var(--c-border-2) !important;
+}
+.admin-dark .el-checkbox__input.is-checked .el-checkbox__inner,
+.admin-dark .el-checkbox__input.is-indeterminate .el-checkbox__inner {
+  background: var(--c-gold) !important;
+  border-color: var(--c-gold) !important;
+}
+.admin-dark .el-checkbox__label { color: var(--c-ink-2) !important; }
+.admin-dark .el-checkbox__input.is-checked + .el-checkbox__label { color: var(--c-ink) !important; }
+
+.admin-dark .el-progress-bar__outer { background: var(--c-surface-2) !important; }
+.admin-dark .el-slider__runway { background: var(--c-surface-2) !important; }
+.admin-dark .el-slider__bar { background: var(--c-gold) !important; }
+
+.admin-dark .el-dialog,
+.admin-dark .el-message-box {
+  background: var(--c-surface) !important;
+  border: 1px solid var(--c-border) !important;
+}
+.admin-dark .el-dialog__title,
+.admin-dark .el-message-box__title { color: var(--c-ink) !important; }
+.admin-dark .el-message-box__content { color: var(--c-ink-2) !important; }
+
+.admin-dark .el-message {
+  background: var(--c-surface) !important;
+  border-color: var(--c-border) !important;
+}
+.admin-dark .el-message__content { color: var(--c-ink-2) !important; }
+
+/* ════════ AdminView 组件级精修（按类名覆盖，不动 .vue）════════ */
+
+/* ── 顶栏 ── */
+.admin-dark .top-nav {
+  background: #0B0B1E !important;
+  border-bottom: 1px solid var(--c-border) !important;
+}
+/* 品牌渐变字：深色底上亮一档 */
+.admin-dark .tn-brand {
+  color: #5B9CF8 !important;
+  background: linear-gradient(135deg, #5B9CF8 0%, #8FBFFA 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* ── 侧栏：比内容更深的面板 + 霓虹 active ── */
+.admin-dark .sidebar {
+  background: #14142E !important;
+  border-right: 1px solid var(--c-border) !important;
+}
+.admin-dark .nav-item { color: var(--c-ink-3) !important; }
+.admin-dark .nav-item:hover {
+  background: rgba(255,255,255,0.05) !important;
+  color: var(--c-ink) !important;
+}
+.admin-dark .nav-item.active {
+  background: linear-gradient(90deg, rgba(236,72,153,0.18), rgba(139,92,246,0.10)) !important;
+  color: #fff !important;
+  box-shadow: inset 3px 0 0 var(--c-pink);
+}
+.admin-dark .nav-item.active svg { color: var(--c-pink) !important; }
+
+/* ── KPI 渐变高亮卡（CRM 签名元素）── */
+.admin-dark .kpi-card {
+  border: none !important;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 26px rgba(0,0,0,0.40);
+}
+/* 右上角高光，增加立体感（呼应参考图）*/
+.admin-dark .kpi-card::after {
+  content: '';
+  position: absolute; top: -40%; right: -10%;
+  width: 160px; height: 160px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.22), transparent 70%);
+  pointer-events: none;
+}
+.admin-dark .kpi-card:nth-child(1) { background: linear-gradient(140deg, #7C3AED 0%, #A855F7 100%) !important; }
+.admin-dark .kpi-card:nth-child(2) { background: linear-gradient(140deg, #0E7490 0%, #06B6D4 100%) !important; }
+.admin-dark .kpi-card:nth-child(3) { background: linear-gradient(140deg, #BE185D 0%, #EC4899 100%) !important; }
+.admin-dark .kpi-card:nth-child(4) { background: linear-gradient(140deg, #047857 0%, #10B981 100%) !important; }
+.admin-dark .kpi-card .kpi-label { color: rgba(255,255,255,0.82) !important; }
+.admin-dark .kpi-card .kpi-value { color: #fff !important; }
+.admin-dark .kpi-card .kpi-trend,
+.admin-dark .kpi-card .kpi-trend.muted { color: rgba(255,255,255,0.88) !important; }
+.admin-dark .kpi-card .kpi-icon-wrap {
+  color: #fff !important;
+  background: rgba(255,255,255,0.20) !important;
+}
+
+/* ── 卡片统一深色（兜底，覆盖可能的硬编码白底）── */
+.admin-dark .card,
+.admin-dark .tab-content .card {
+  background: var(--grad-card) !important;
+  border: 1px solid var(--c-border) !important;
+  box-shadow: var(--shadow-sm);
+}
+.admin-dark .card-title { color: var(--c-ink) !important; }
+.admin-dark .page-header h2 { color: var(--c-ink) !important; }
+
+/* ── 分段按钮 / 次级按钮 ── */
+.admin-dark .range-tabs { background: var(--c-surface-2) !important; }
+.admin-dark .range-btn { color: var(--c-ink-3) !important; }
+.admin-dark .range-btn.active {
+  background: var(--c-gold) !important;
+  color: #fff !important;
+}
+.admin-dark .ghost-btn {
+  background: var(--c-surface-2) !important;
+  border-color: var(--c-border) !important;
+  color: var(--c-ink-2) !important;
+}
+.admin-dark .ghost-btn:hover { border-color: var(--c-gold-bdr) !important; color: var(--c-ink) !important; }
+.admin-dark .primary-btn {
+  background: var(--grad-violet) !important;
+  border: none !important;
+  color: #fff !important;
+}
+
+/* ── 登录页（AdminLoginView）── */
+/* 整页连续渐变（与浅色同思路）：深紫左板在中缝羽化进深蓝纸底，无割裂 */
+.admin-dark .lp {
+  background: linear-gradient(90deg,
+    #221F45 0%, #1A1A38 34%, #14142E 46%,
+    #121229 54%, #101025 59%, #0F0F23 64%, #0F0F23 100%) !important;
+}
+/* 右箭头浅色模式是蓝描边样式，深色下拉回白色幽灵样式 */
+.admin-dark .s-arr-r {
+  border-color: rgba(255,255,255,0.30) !important;
+  background: rgba(255,255,255,0.12) !important;
+  color: rgba(255,255,255,0.85) !important;
+}
+.admin-dark .s-arr-r:hover {
+  background: rgba(255,255,255,0.22) !important;
+  border-color: rgba(255,255,255,0.50) !important;
+}
+.admin-dark .showcase {
+  background: transparent !important;
+  position: relative;
+}
+.admin-dark .showcase::before {
+  content: '';
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(540px 380px at 20% 12%, rgba(139,92,246,0.18), transparent 60%),
+    radial-gradient(460px 360px at 80% 90%, rgba(34,211,238,0.12), transparent 60%);
+}
+/* 浅色模式组件里 logo 白字/金色指示点，深色模式拉回紫罗兰霓虹 */
+.admin-dark .s-logo span { color: var(--c-gold-2) !important; }
+.admin-dark .s-dot.on { background: var(--c-gold) !important; }
+/* 登录卡片/主按钮实际类名是 .l-card / .l-btn（.login-card/.auth-card 为历史别名，保留兼容） */
+.admin-dark .l-card,
+.admin-dark .login-card,
+.admin-dark .auth-card { background: var(--grad-card) !important; border: 1px solid var(--c-border) !important; }
+.admin-dark .l-btn,
+.admin-dark .login-btn,
+.admin-dark .auth-submit { background: var(--grad-violet) !important; border: none !important; color: #fff !important; }
+.admin-dark .l-btn:hover:not(:disabled) { filter: brightness(1.15); }
+/* 登录页明暗切换胶囊：深色下加霓虹描边感 */
+.admin-dark .theme-fab {
+  background: rgba(26,26,53,0.85) !important;
+  border-color: var(--c-border-2) !important;
+  color: var(--c-ink-2) !important;
+}
+.admin-dark .theme-fab:hover {
+  color: var(--c-gold-2) !important;
+  border-color: var(--c-gold-bdr) !important;
+  box-shadow: 0 0 14px rgba(139,92,246,0.35) !important;
+}
+
+/* ── gold 系文字可读性兜底 ──
+   紫字压在紫色半透底（active/chip）、或深紫压深底（hover）对比不足 → 统一提亮。*/
+.admin-dark .kb-nav-btn.active,
+.admin-dark .cat-btn.active,
+.admin-dark .ai-quick-chip,
+.admin-dark .hot-rank.top { color: var(--c-gold-3) !important; }
+.admin-dark .kb-nav-btn:hover:not(.active),
+.admin-dark .cat-btn:hover:not(.active) { color: var(--c-gold-2) !important; }
+.admin-dark .ai-quick-chip:hover { color: #fff !important; }
+
+/* ═══ AI 助手面板：浅色模式写死了淡蓝字面值，深色还原为 token 体系 ═══ */
+.admin-dark .ai-panel-header { background: linear-gradient(135deg, var(--c-gold-bg) 0%, var(--c-surface) 100%) !important; }
+.admin-dark .ai-header-ico { color: var(--c-gold) !important; }
+.admin-dark .ai-quick-chip { background: var(--c-gold-bg) !important; border-color: var(--c-gold-bdr) !important; }
+.admin-dark .ai-bot-icon,
+.admin-dark .ai-msg-icon { background: var(--c-gold-bg) !important; border-color: var(--c-gold-bdr) !important; color: var(--c-gold) !important; }
+
+/* ═══ 感受度报告改版（rpt-*）：token 自动翻色，此处只覆盖写死的浅色品牌色 ═══ */
+.admin-dark .rpt-kpi-ico.k0 { background: rgba(91,156,248,0.14) !important; color: #7DB5FA !important; }
+.admin-dark .rpt-kpi-ico.k1 { background: rgba(167,139,250,0.14) !important; color: #A78BFA !important; }
+.admin-dark .rpt-kpi-ico.k2 { background: rgba(255,154,46,0.14) !important; color: #FFB562 !important; }
+.admin-dark .rpt-kpi-ico.k3 { background: linear-gradient(135deg, #3E6FD9, #5B9CF8) !important; color: #fff !important; }
+.admin-dark .rpt-rank.top   { background: #5B9CF8 !important; }
+.admin-dark .rpt-fill       { background: linear-gradient(90deg, #5B9CF8, #7DB5FA) !important; }
+.admin-dark .rpt-link       { color: #7DB5FA !important; }
+.admin-dark .rpt-doc h4     { border-left-color: #7DB5FA !important; }
+.admin-dark .rpt-hd-legend .rpt-dot.pos { background: #5EEAD4 !important; }
+.admin-dark .rpt-hd-legend .rpt-dot.neg { background: #F87171 !important; }

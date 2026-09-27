@@ -1,0 +1,29 @@
+# LLM & AI
+dashscope>=1.20.0
+FlagEmbedding>=1.2.5
+rank_bm25>=0.2.2
+
+# 向量数据库
+chromadb>=0.5.0
+
+# 文档处理
+python-docx>=1.1.0
+openpyxl>=3.1.0
+pandas>=2.0.0
+
+# 后端
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+python-multipart>=0.0.9
+
+# ASR（本地语音识别，faster-whisper CPU int8；ECS 无 GPU 不跑，故不进 requirements.cloud.txt）
+faster-whisper>=1.1.0
+edge-tts>=7.0.0          # 兼作 ASR 闭环测试音频生成
+
+# 工具
+python-dotenv>=1.0.0
+
+# 扫码接力二维码渲染（纯 Python，0 系统依赖）
+segno>=1.6.0

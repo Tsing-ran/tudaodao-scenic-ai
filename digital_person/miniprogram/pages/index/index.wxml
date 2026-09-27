@@ -1,0 +1,178 @@
+<!-- 灵境·导览 — 游客端主交互页 -->
+<view class="app">
+
+  <!-- ── 数字人画面（全屏 HLS 直播）── -->
+  <view class="hero">
+    <video
+      wx:if="{{started}}"
+      id="dh"
+      class="hero-video"
+      src="{{hls}}"
+      autoplay
+      muted="{{videoMuted}}"
+      object-fit="cover"
+      controls="{{false}}"
+      show-center-play-btn="{{false}}"
+      show-play-btn="{{false}}"
+      show-fullscreen-btn="{{false}}"
+      show-progress="{{false}}"
+      enable-progress-gesture="{{false}}"
+      vslide-gesture="{{false}}"
+      binderror="onVideoError"
+      bindwaiting="onVideoWaiting"
+      bindplaying="onVideoPlaying"
+      bindloadedmetadata="onVideoLoadedMeta"
+      bindplay="onVideoPlay"
+      bindpause="onVideoPause"
+      bindended="onVideoEnded"
+      bindtimeupdate="onVideoTimeUpdate"
+      bindprogress="onVideoProgress"
+    ></video>
+    <view wx:if="{{videoStalled}}" class="hero-fallback">
+      <view class="hf-orb"><image class="hf-ic" src="/assets/icons/spark.svg" /></view>
+      <text class="hf-txt">{{videoStalledText}}</text>
+    </view>
+  </view>
+
+  <!-- 调试 HUD：固定屏幕中部、最高层级，真机必可见（定位 HLS 卡点；上线前删） -->
+  <view wx:if="{{vdebug}}" class="vdebug" catchtap="copyDebug">
+    <text class="vdebug-title">📺 VIDEO 调试（点此复制）</text>
+    <text class="vdebug-body">{{vdebug}}</text>
+  </view>
+  <view class="scrim"></view>
+
+  <!-- ── 自定义沉浸导航栏 ── -->
+  <view class="nav" style="padding-top:{{statusBarHeight}}px;height:{{navBarHeight}}px;">
+    <view class="brand">
+      <view class="brand-logo"><image class="brand-spark" src="/assets/icons/spark.svg" /></view>
+      <view class="brand-text">
+        <text class="brand-name">灵境 · 导览</text>
+        <text class="brand-sub">AI 数字人导游</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- ── 景区 / 同行人选择器 ── -->
+  <view class="selectors" style="top:{{statusBarHeight + navBarHeight + 6}}px;">
+    <picker class="sel" mode="selector" range="{{scenicNames}}" value="{{scenicIndex}}" bindchange="onScenicChange">
+      <view class="sel-chip tap">
+        <text>{{scenicNames[scenicIndex]}}</text>
+        <image class="sel-arrow" src="/assets/icons/chevron.svg" />
+      </view>
+    </picker>
+    <picker class="sel" mode="selector" range="{{groupNames}}" value="{{groupIndex}}" bindchange="onGroupChange">
+      <view class="sel-chip tap">
+        <text>{{groupNames[groupIndex]}}</text>
+        <image class="sel-arrow" src="/assets/icons/chevron.svg" />
+      </view>
+    </picker>
+  </view>
+
+  <!-- ── 连接状态 ── -->
+  <view wx:if="{{started}}" class="status" style="top:{{statusBarHeight + navBarHeight + 66}}px;">
+    <view class="dot {{connected ? 'on' : ''}}"></view>
+    <text>{{statusText}}</text>
+  </view>
+
+  <!-- ── 行程游记 FAB ── -->
+  <view wx:if="{{started}}" class="fab tap" bindtap="openTrip">
+    <image class="fab-ic" src="/assets/icons/book.svg" />
+  </view>
+
+  <!-- ── 字幕区 ── -->
+  <view wx:if="{{started}}" class="caption">
+    <view class="tags" wx:if="{{location || intentLabel || emoLabel || timing}}">
+      <view wx:if="{{location}}" class="tag tag-loc">
+        <image class="tag-ic" src="/assets/icons/pin.svg" /><text>{{location}}</text>
+      </view>
+      <view wx:if="{{intentLabel}}" class="tag">{{intentLabel}}</view>
+      <view wx:if="{{emoLabel}}" class="tag tag-emo">{{emoLabel}}</view>
+      <view wx:if="{{timing}}" class="tag tag-tm">⏱ {{timing}}s</view>
+    </view>
+
+    <view class="bubble {{reply ? '' : 'bubble-empty'}}">
+      <!-- 思考中：骨架屏 -->
+      <view wx:if="{{thinking}}" class="skeleton">
+        <view class="sk-line"></view>
+        <view class="sk-line"></view>
+        <view class="sk-line short"></view>
+      </view>
+      <text wx:else>{{reply || placeholder}}</text>
+    </view>
+  </view>
+
+  <!-- ── 底部输入坞 ── -->
+  <view wx:if="{{started}}" class="dock" style="padding-bottom:{{safeBottom + 16}}px;">
+    <scroll-view class="sugg" scroll-x enable-flex show-scrollbar="{{false}}">
+      <view wx:for="{{suggestions}}" wx:key="t" class="sugg-item tap" data-i="{{index}}" bindtap="quickAsk">{{item.t}}</view>
+    </scroll-view>
+
+    <view class="bar">
+      <input
+        class="bar-input"
+        value="{{draft}}"
+        placeholder="问点什么…"
+        placeholder-class="bar-ph"
+        confirm-type="send"
+        adjust-position="{{true}}"
+        cursor-spacing="20"
+        bindinput="onInput"
+        bindconfirm="askText"
+        disabled="{{!connected || busy}}"
+      />
+      <view class="ic tap {{busy ? 'ic-disabled' : ''}}" bindtap="takePhoto">
+        <image class="ic-img" src="/assets/icons/camera.svg" />
+      </view>
+      <view
+        class="ic ic-mic tap {{micState}}"
+        bindtouchstart="micStart"
+        bindtouchend="micEnd"
+        bindtouchcancel="micEnd"
+      >
+        <image class="ic-img" src="{{micState === 'recording' ? '/assets/icons/mic-on.svg' : '/assets/icons/mic.svg'}}" />
+      </view>
+      <view class="ic ic-go tap {{(!draft || busy) ? 'ic-disabled' : ''}}" bindtap="askText">
+        <image class="ic-img" src="/assets/icons/send.svg" />
+      </view>
+    </view>
+
+    <view wx:if="{{micState === 'recording'}}" class="mic-hint">松开发送 · 上滑取消</view>
+  </view>
+
+  <!-- ── 开场封面 ── -->
+  <view class="cover {{started ? 'cover-hide' : ''}}">
+    <view class="cover-orb"><image class="cover-spark" src="/assets/icons/spark.svg" /></view>
+    <text class="cover-title">灵境 · 导览</text>
+    <text class="cover-desc">您的 AI 数字人导游「慧昭」，为您实时讲解、个性化推荐路线，陪您看遍这片山水胜境。</text>
+    <view class="cover-feats">
+      <view class="feat"><view class="feat-dot"></view><text>语音问答</text></view>
+      <view class="feat"><view class="feat-dot"></view><text>拍照定位</text></view>
+      <view class="feat"><view class="feat-dot"></view><text>路线推荐</text></view>
+      <view class="feat"><view class="feat-dot"></view><text>表情互动</text></view>
+    </view>
+    <view wx:if="{{!connecting}}" class="cover-start tap" bindtap="start">开 始 游 览</view>
+    <view wx:else class="cover-loading">
+      <view class="spinner"></view><text>{{connectingText}}</text>
+    </view>
+  </view>
+
+  <!-- ── 行程游记弹层 ── -->
+  <view class="sheet-mask {{tripOpen ? 'show' : ''}}" bindtap="closeTrip">
+    <view class="sheet" catchtap="noop" style="padding-bottom:{{safeBottom + 28}}px;">
+      <view class="grip"></view>
+      <view class="sheet-head">
+        <image class="sheet-ic" src="/assets/icons/book.svg" />
+        <text class="sheet-title">我的电子游记</text>
+      </view>
+      <text class="sheet-sub">{{scenicNames[scenicIndex]}} · 慧昭为您记录这趟旅程</text>
+      <view class="sheet-body">
+        <view wx:if="{{tripLoading}}" class="skeleton skeleton-dark">
+          <view class="sk-line"></view><view class="sk-line"></view>
+          <view class="sk-line"></view><view class="sk-line short"></view>
+        </view>
+        <text wx:else>{{tripText}}</text>
+      </view>
+    </view>
+  </view>
+
+</view>
